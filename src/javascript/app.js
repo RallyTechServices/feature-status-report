@@ -46,10 +46,29 @@ Ext.define('CustomApp', {
         this.logger.log('_export', store.getData());
         
         var xml_text = '';
-        Ext.each(store.getData().items, function(r){
+        
+        var html_text = '';
+        Ext.each(this.exportData, function(r){
 //            if (xml_text.length == 0){
 //                xml_text = r.getHeaderRow();  
 //            }
+            
+            var blocker_reasons = r.get('BlockerReasons').replace('<br/>',' | ','g');
+            var blocker_owner = r.get('BlockerOwner').replace('<br/>',' | ','g');
+            var blocker_dates = r.get('BlockerDate').replace('<br/>',' | ','g');
+
+            html_text += Ext.String.format('<table><tr><td style="background-color:{0}"></td>' +
+                    '<td>{1}</td>' +
+                    '<td>{2}</td>' +
+                    '<td>{3}</td>' +
+                    '<td>{4}</td>' +
+                    '<td>{5}</td>' +
+                    '<td>{6}</td>' +
+                    '</tr></table>',r.get('FeatureStatus'),
+                    r.get('CodeDeploymentSchedule'),r.get('FormattedFeature'),blocker_reasons,blocker_dates, 
+                    blocker_owner, 
+                    r.get('Comments'));
+            
             xml_text += Ext.String.format('<ss:Row><ss:Cell><ss:Data ss:Type="String">{0}</ss:Data></ss:Cell>' +
                     '<ss:Cell><ss:Data ss:Type="String">{1}</ss:Data></ss:Cell>' +
                     '<ss:Cell><ss:Data ss:Type="String">{2}</ss:Data></ss:Cell>' +
@@ -58,8 +77,8 @@ Ext.define('CustomApp', {
                     '<ss:Cell><ss:Data ss:Type="String">{5}</ss:Data></ss:Cell>' +
                     '<ss:Cell><ss:Data ss:Type="String">{6}</ss:Data></ss:Cell>' +
                     '</ss:Row>',r.get('FeatureStatus'),
-                    r.get('CodeDeploymentSchedule'),r.get('FormattedFeature'),r.get('BlockerReasons'),r.get('BlockerDate'), 
-                    r.get('BlockerOwner'), 
+                    r.get('CodeDeploymentSchedule'),r.get('FormattedFeature'),blocker_reasons,blocker_dates, 
+                    blocker_owner, 
                     r.get('Comments'));
         });
         
@@ -70,6 +89,8 @@ Ext.define('CustomApp', {
         '<ss:Worksheet ss:Name="' + this.getContext().getProject().Name + '">' +
         '<ss:Table>{0}</ss:Table></ss:Worksheet></ss:Workbook>',xml_text);
         console.log(text);
+        
+//        Rally.technicalservices.FileUtilities.saveTextAsFile(html_text, 'features.html');
  //       html_text = Ext.String.format('<table>{0}</table>', html_text);
         Rally.technicalservices.FileUtilities.saveTextAsFile(text,'feature-report.html');
         
@@ -83,6 +104,7 @@ Ext.define('CustomApp', {
                 this._fetchChildren(featureRecords).then({
                     scope: this,
                     success: function(data){
+                        this.exportData = data;  
                         var store = this._buildDataStore(data);
                         this._buildGrid(store);
                     }
