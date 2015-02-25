@@ -3,11 +3,11 @@
 <head>
     <title>Feature Status Report</title>
     <!--  (c) 2014 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Wed Feb 25 2015 10:08:24 GMT-0800 (PST) -->
+    <!--  Build Date: Wed Feb 25 2015 11:15:48 GMT-0800 (PST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Feb 25 2015 10:08:24 GMT-0800 (PST)";
-        var CHECKSUM = 10081674943;
+        var APP_BUILD_DATE = "Wed Feb 25 2015 11:15:48 GMT-0800 (PST)";
+        var CHECKSUM = 10160373545;
     </script>
     
     <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
@@ -163,7 +163,7 @@ Ext.define('Rally.technicalservices.data.Chunker',{
                 promises.push(this._fetchRecords(chunk_values));
             }
         } else {
-            promises.push(this._fetchRecords(object_ids));
+            promises.push(this._fetchRecords(oids));
         }
     
         if (promises.length == 0){
@@ -546,7 +546,7 @@ Ext.define('CustomApp', {
         }; 
         
         var object_ids = _.map(featureRecords, function(f){return f.get('ObjectID');});
-        
+        this.logger.log('_fetchChildren', object_ids.length, object_ids);
         var chunker = Ext.create('Rally.technicalservices.data.Chunker',{
             fetch: fetch,
             find: find,

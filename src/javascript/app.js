@@ -182,7 +182,7 @@ Ext.define('CustomApp', {
         }; 
         
         var object_ids = _.map(featureRecords, function(f){return f.get('ObjectID');});
-        
+        this.logger.log('_fetchChildren', object_ids.length, object_ids);
         var chunker = Ext.create('Rally.technicalservices.data.Chunker',{
             fetch: fetch,
             find: find,
