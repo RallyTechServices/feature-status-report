@@ -3,10 +3,10 @@
 <head>
     <title>Feature Status Report</title>
     <!--  (c) 2013 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Wed Feb 25 2015 10:08:24 GMT-0800 (PST) -->
+    <!--  Build Date: Wed Feb 25 2015 11:15:48 GMT-0800 (PST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Feb 25 2015 10:08:24 GMT-0800 (PST)";
+        var APP_BUILD_DATE = "Wed Feb 25 2015 11:15:48 GMT-0800 (PST)";
         var CHECKSUM = [%= checksum %];
     </script>
     

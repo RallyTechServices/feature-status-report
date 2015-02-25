@@ -23,7 +23,7 @@ Ext.define('Rally.technicalservices.data.Chunker',{
                 promises.push(this._fetchRecords(chunk_values));
             }
         } else {
-            promises.push(this._fetchRecords(object_ids));
+            promises.push(this._fetchRecords(oids));
         }
     
         if (promises.length == 0){
