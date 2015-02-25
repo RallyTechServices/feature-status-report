@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Feature Status Report</title>
+    <!--  (c) 2014 Rally Software Development Corp.  All Rights Reserved. -->
+    <!--  Build Date: Wed Feb 25 2015 10:08:24 GMT-0800 (PST) -->
+    
+    <script type="text/javascript">
+        var APP_BUILD_DATE = "Wed Feb 25 2015 10:08:24 GMT-0800 (PST)";
+        var CHECKSUM = [%= checksum %];
+    </script>
+    
+    <script type="text/javascript" src="https://rally1.rallydev.com/apps/2.0rc3/sdk-debug.js?apiKey=_PUT_APIKEY_HERE_"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function() {
+             
+/**
+ * A link that pops up a version dialog box
+ */
+
+Ext.define('Rally.technicalservices.InfoLink',{
+    extend: 'Ext.Component',
+    alias: 'widget.tsinfolink',
+    
+    /**
+     * @cfg {String} informationHtml
+     * Additional text to be displayed on the popup dialog (for exmaple,
+     * to add a description of the app's use or functionality)
+     */
+    informationHtml: null,
+    
+    /**
+     * 
+     * cfg {String} title
+     * The title for the dialog box
+     */
+     title: "Build Information",
+    
+    renderTpl: "<div id='{id}-infolinkWrap' class='tsinfolink'>i</div>",
+
+    initComponent: function() {
+        this.callParent(arguments);
+       
+    },
+    
+    onRender: function() {
+        this.callParent(arguments);
+        this.mon(this.el,'click',this.onClick,this);
+    },
+    _generateChecksum: function(string){
+        var chk = 0x12345678,
+            i;
+        string = string.replace(/var CHECKSUM = .*;/,"");
+        string = string.replace(/\s/g,"");  //Remove all whitespace from the string.
+        
+        for (i = 0; i < string.length; i++) {
+            chk += (string.charCodeAt(i) * i);
+        }
+    
+        return chk;
+    },
+    _checkChecksum: function(container) {
+        var me = this;
+        Ext.Ajax.request({
+            url: document.URL,
+            params: {
+                id: 1
+            },
+            success: function (response) {
+                text = response.responseText;
+                if ( CHECKSUM ) {
+                    if ( CHECKSUM !== me._generateChecksum(text) ) {
+                        console.log("Checksums don't match!");
+                        if ( me.dialog ) {
+                            me.dialog.add({xtype:'container',html:'Checksums do not match'});
+                        }
+                    }
+                }
+            }
+        });
+    },
+    onClick: function(e) {
+        var me = this;
+        this._checkChecksum(this);
+        
+        var dialog_items = [];
+        
+        if ( this.informationHtml ) {
+            dialog_items.push({
+                xtype:'container',
+                html: this.informationHtml
+            });
+        }
+                
+        dialog_items.push({
+            xtype:'container',
+            html:"This app was created by the Rally Technical Services Team."
+        });
+        
+        if ( APP_BUILD_DATE ) {
+            dialog_items.push({
+                xtype:'container',
+                html:'Build date/time: ' + APP_BUILD_DATE
+            });
+        }
+        
+        if (this.dialog){this.dialog.destroy();}
+        this.dialog = Ext.create('Rally.ui.dialog.Dialog',{
+            defaults: { padding: 5, margin: 5 },
+            closable: true,
+            draggable: true,
+            title: me.title,
+            items: dialog_items
+        });
+        this.dialog.show();
+    }
+});
+
+/*
+ */
+Ext.define('Rally.technicalservices.Logger',{
+    constructor: function(config){
+        Ext.apply(this,config);
+    },
+    log: function(args){
+        var timestamp = "[ " + Ext.util.Format.date(new Date(), "Y-m-d H:i:s.u") + " ]";
+        //var output_args = arguments;
+        //output_args.unshift( [ "[ " + timestamp + " ]" ] );
+        //output_args = Ext.Array.push(output_args,arguments);
+        
+        var output_args = [];
+        output_args = Ext.Array.push(output_args,[timestamp]);
+        output_args = Ext.Array.push(output_args, Ext.Array.slice(arguments,0));
+
+        window.console && console.log.apply(console,output_args);
+    }
+
+});
+
+Ext.define('Rally.technicalservices.data.Chunker',{
+    MAX_CHUNK_SIZE: 25,
+    logger: new Rally.technicalservices.Logger(),
+    config: {
+        fetch: null,
+        find: null,
+        chunkField: null,
+        chunkOids: null
+    },
+    constructor: function(config){
+        this.initConfig(config);
+    },
+    load: function(){
+        var deferred = Ext.create('Deft.Deferred');
+        var oids = this.chunkOids; 
+        var promises = [];
+        
+        if (oids.length > this.MAX_CHUNK_SIZE){
+            var start_idx = 0;
+            console.log('original array',oids);
+            while(start_idx < oids.length){
+                chunk_values = oids.splice(start_idx, this.MAX_CHUNK_SIZE);
+                promises.push(this._fetchRecords(chunk_values));
+            }
+        } else {
+            promises.push(this._fetchRecords(object_ids));
+        }
+    
+        if (promises.length == 0){
+            deferred.resolve();
+        }
+        Deft.Promise.all(promises).then({
+            scope: this,
+            success: function(records) {
+                var data = _.flatten(records);
+                deferred.resolve(data);
+           },
+           failure: function(){
+               deferred.resolve([]);
+           }
+        });
+        return deferred; 
+    },
+    _fetchRecords: function(object_ids){
+        var deferred = Ext.create('Deft.Deferred');
+        
+        var find = this.find;
+        find[this.chunkField] = {$in: object_ids}
+        
+        Ext.create('Rally.data.lookback.SnapshotStore',{
+            fetch: this.fetch,
+            autoLoad: true,
+            find: find, 
+            listeners: {
+                scope: this,
+                load: function(store, records, success){
+                    this.logger.log('chunking success', success);
+                    deferred.resolve(records);
+                }
+            }
+        });
+        return deferred;  
+    }
+});
+Ext.define('Rally.technicalservices.data.FeatureStatusModel',{
+    extend: 'Ext.data.Model',
+
+    emptyString: '(Empty)',
+    fields: [
+             {name: 'FeatureStatus' },
+             {name: 'FeatureRef', type:'string'},
+             {name: 'ObjectID', type: 'int'},
+             {name: 'CodeDeploymentSchedule', type: 'string'},
+             {name: 'FeatureFormattedID', type: 'string'},
+             {name: 'FeatureName', type:'string'},
+             {name: 'BlockedChildren', type: 'auto'},
+             {name: 'Comments', type:'string'},
+             {name: 'FormattedFeature', type: 'string', 
+                 convert: function(v, rec){
+                     return Ext.String.format('{0}:{1}',rec.get('FeatureFormattedID'), rec.get('FeatureName')); 
+                 }
+             },
+             {name: 'BlockerReasons', type: 'string', 
+                 convert: function(v, rec){
+                     var blocked_reason = '';
+                     Ext.each(rec.get('BlockedChildren'), function(child){
+                         var reason = child.get('BlockedReason') || rec.emptyString;
+                         blocked_reason += reason + '<br/>';
+                     });
+                     return blocked_reason;  
+                 }
+              },
+             {name: 'BlockerOwner', type: 'string', 
+                  convert: function(v, rec){
+                      var blocked_owner = '';
+                      Ext.each(rec.get('BlockedChildren'), function(child){
+                          var owner = child.get('c_BlockerOwnerFirstLast') || rec.emptyString;
+                          blocked_owner += owner + '<br/>';
+                      });
+                      return blocked_owner;  
+                  }
+             },
+             {name: 'BlockerDate', type: 'string', 
+                 convert: function(v, rec){
+                     var blocked_date = '';
+                     Ext.each(rec.get('BlockedChildren'), function(child){
+                         var date = child.get('c_BlockerCreationDate');
+                         if (date){
+                             blocked_date += Rally.util.DateTime.formatWithDefault(Rally.util.DateTime.fromIsoString(date)) + '<br/>';
+                         } else {
+                             blocked_date += rec.emptyString + '<br/>';
+                         }
+                     });
+                     return blocked_date;  
+                 }
+             }],
+             getHeaderRow: function(){
+                 return Ext.String.format('<tr><td>Status</td><td>Code Deployment Schedule</td><td>Feature</td><td>Blocker Reasons</td><td>Blocker Date</td><td>Blocker Owner</td><td>Comments</td></tr>');
+             },
+             getHtmlRow: function(){
+                 return Ext.String.format('<tr><td style="background-color:{0}"></td><td>{1}</td><td>{2}</td><td style="mso-data-placement:same-cell;">{3}</td><td style="mso-data-placement:same-cell;">{4}</td><td style="mso-data-placement:same-cell;">{5}</td><td style="mso-data-placement:same-cell;">{6}</td></tr>',
+                         this.get('FeatureStatus'),
+                         this.get('CodeDeploymentSchedule'),
+                         this.get('FormattedFeature'),
+                         this.get('BlockerReasons'),
+                         this.get('BlockerDate'),
+                         this.get('BlockerOwner'),
+                         this.get('Comments'));
+             },
+             getXMLHeader: function(){},
+             getXMLRow: function(){}
+             
+             
+             /**
+              * 
+              * <?xml version="1.0"?>
+<ss:Workbook xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+    <ss:Worksheet ss:Name="Sheet1">
+        <ss:Table>
+            <ss:Row>
+                <ss:Cell>
+                    <ss:Data ss:Type="String">First Name</ss:Data>
+                </ss:Cell>
+                <ss:Cell>
+                    <ss:Data ss:Type="String">Last Name</ss:Data>
+                </ss:Cell>
+                <ss:Cell>
+                    <ss:Data ss:Type="String">Phone Number</ss:Data>
+                </ss:Cell>
+            </ss:Row>
+        </ss:Table>
+    </ss:Worksheet>
+</ss:Workbook>
+              * 
+              * 
+              * 
+              */
+});
+Ext.define('Rally.technicalservices.FileUtilities', {
+    singleton: true,
+    logger: new Rally.technicalservices.Logger(),
+    
+    saveTextAsFile: function(textToWrite, fileName)
+    {
+        var textFileAsBlob = new Blob([textToWrite], {type:'text/plain'});
+        var fileNameToSaveAs = fileName;
+
+        var downloadLink = document.createElement("a");
+        downloadLink.download = fileNameToSaveAs;
+        downloadLink.innerHTML = "Download File";
+        if (window.webkitURL != null)
+        {
+            // Chrome allows the link to be clicked
+            // without actually adding it to the DOM.
+            downloadLink.href = window.webkitURL.createObjectURL(textFileAsBlob);
+        }
+        else
+        {
+            // Firefox requires the link to be added to the DOM
+            // before it can be clicked.
+            downloadLink.href = window.URL.createObjectURL(textFileAsBlob);
+            downloadLink.onclick = destroyClickedElement;
+            downloadLink.style.display = "none";
+            document.body.appendChild(downloadLink);
+        }
+        downloadLink.click();
+    },
+    destroyClickedElement: function(event)
+    {
+        document.body.removeChild(event.target);
+    },
+    convertDataArrayToCSVText: function(data_array, requestedFieldHash){
+       
+        var text = '';
+        Ext.each(Object.keys(requestedFieldHash), function(key){
+            text += requestedFieldHash[key] + ',';
+        });
+        text = text.replace(/,$/,'\n');
+        
+        Ext.each(data_array, function(d){
+            Ext.each(Object.keys(requestedFieldHash), function(key){
+                if (d[key]){
+                    if (typeof d[key] === 'object'){
+                        if (d[key].FormattedID) {
+                            text += Ext.String.format("\"{0}\",",d[key].FormattedID ); 
+                        } else if (d[key].Name) {
+                            text += Ext.String.format("\"{0}\",",d[key].Name );                    
+                        } else if (!isNaN(Date.parse(d[key]))){
+                            text += Ext.String.format("\"{0}\",",Rally.util.DateTime.formatWithDefaultDateTime(d[key]));
+                        }else {
+                            text += Ext.String.format("\"{0}\",",d[key].toString());
+                        }
+                    } else {
+                        text += Ext.String.format("\"{0}\",",d[key] );                    
+                    }
+                } else {
+                    text += ',';
+                }
+            },this);
+            text = text.replace(/,$/,'\n');
+        },this);
+        return text;
+    }
+});
+Ext.define('CustomApp', {
+    extend: 'Rally.app.App',
+    componentCls: 'app',
+    logger: new Rally.technicalservices.Logger(),
+    items: [
+        {xtype:'container',itemId:'selection_box', layout: {type: 'hbox'}},
+        {xtype:'container',itemId:'display_box'},
+        {xtype:'tsinfolink'}
+    ],
+    featureModel: 'PortfolioItem/Feature',
+    featureFetchFields: ['FormattedID','Name','c_CodeDeploymentSchedule','Notes','DisplayColor'],
+    childrenFetchFields: ['FormattedID','Name','_ItemHierarchy','Blocked','BlockedReason','c_BlockerCreationDate','c_BlockerOwnerFirstLast'],
+    
+    launch: function() {
+        this._initialize();
+    },
+    _initialize: function(){
+        this.logger.log('_initialize');
+        var margin = 10; 
+        this.down('#selection_box').add({
+            xtype: 'rallyreleasecombobox',
+            itemId: 'cb-release',
+            fieldLabel: 'Release Filter',
+            labelAlign: 'right',
+            width: 250,
+            margin: margin,
+            context: {project: this.getContext().getProjectRef(), projectScopeDown: false}
+        });
+        this.down('#selection_box').add({
+            xtype: 'rallybutton',
+            text: 'Run',
+            scope: this,
+            margin: margin,
+            handler: this._run
+        });
+        this.down('#selection_box').add({
+            xtype: 'rallybutton',
+            text: 'Export',
+            scope: this,
+            margin: margin,
+            handler: this._export
+        });
+    },
+    _export: function(){
+        var store = this.down('#grd-report').getStore(); 
+        this.logger.log('_export', store.getData());
+        
+        var xml_text = '';
+        
+        var html_text = '';
+        Ext.each(this.exportData, function(r){
+//            if (xml_text.length == 0){
+//                xml_text = r.getHeaderRow();  
+//            }
+            
+            var blocker_reasons = r.get('BlockerReasons').replace('<br/>',' | ','g');
+            var blocker_owner = r.get('BlockerOwner').replace('<br/>',' | ','g');
+            var blocker_dates = r.get('BlockerDate').replace('<br/>',' | ','g');
+
+            html_text += Ext.String.format('<table><tr><td style="background-color:{0}"></td>' +
+                    '<td>{1}</td>' +
+                    '<td>{2}</td>' +
+                    '<td>{3}</td>' +
+                    '<td>{4}</td>' +
+                    '<td>{5}</td>' +
+                    '<td>{6}</td>' +
+                    '</tr></table>',r.get('FeatureStatus'),
+                    r.get('CodeDeploymentSchedule'),r.get('FormattedFeature'),blocker_reasons,blocker_dates, 
+                    blocker_owner, 
+                    r.get('Comments'));
+            
+            xml_text += Ext.String.format('<ss:Row><ss:Cell><ss:Data ss:Type="String">{0}</ss:Data></ss:Cell>' +
+                    '<ss:Cell><ss:Data ss:Type="String">{1}</ss:Data></ss:Cell>' +
+                    '<ss:Cell><ss:Data ss:Type="String">{2}</ss:Data></ss:Cell>' +
+                    '<ss:Cell><ss:Data ss:Type="String">{3}</ss:Data></ss:Cell>' +
+                    '<ss:Cell><ss:Data ss:Type="String">{4}</ss:Data></ss:Cell>' +
+                    '<ss:Cell><ss:Data ss:Type="String">{5}</ss:Data></ss:Cell>' +
+                    '<ss:Cell><ss:Data ss:Type="String">{6}</ss:Data></ss:Cell>' +
+                    '</ss:Row>',r.get('FeatureStatus'),
+                    r.get('CodeDeploymentSchedule'),r.get('FormattedFeature'),blocker_reasons,blocker_dates, 
+                    blocker_owner, 
+                    r.get('Comments'));
+        });
+        
+
+
+        var text = Ext.String.format('<?xml version="1.0"?>' +
+        '<ss:Workbook xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">' +
+        '<ss:Worksheet ss:Name="' + this.getContext().getProject().Name + '">' +
+        '<ss:Table>{0}</ss:Table></ss:Worksheet></ss:Workbook>',xml_text);
+        console.log(text);
+        
+//        Rally.technicalservices.FileUtilities.saveTextAsFile(html_text, 'features.html');
+ //       html_text = Ext.String.format('<table>{0}</table>', html_text);
+        Rally.technicalservices.FileUtilities.saveTextAsFile(text,'feature-report.html');
+        
+    },
+    _run: function(){
+        var release = this.down('#cb-release').getValue();
+        
+        this._fetchFeatures(release).then({
+            scope: this,
+            success: function(featureRecords){
+                this._fetchChildren(featureRecords).then({
+                    scope: this,
+                    success: function(data){
+                        this.exportData = data;  
+                        var store = this._buildDataStore(data);
+                        this._buildGrid(store);
+                    }
+                });
+            }
+        });
+    },
+    _buildDataStore: function(data){
+       this.logger.log('_buildDataStore',data);
+       return Ext.create('Rally.data.custom.Store',{
+           data: data
+       });
+    },
+    _buildGrid: function(store){
+        if (this.down('#grd-report')){
+            this.down('#grd-report').destroy();
+        }
+        
+        this.down('#display_box').add({
+            xtype: 'rallygrid',
+            itemId: 'grd-report',
+            store: store,
+            columnCfgs: this._getColumnCfgs()
+        });
+    },
+    _getColumnCfgs: function(){
+        return [{
+            text: 'Status',
+            dataIndex: 'FeatureStatus',
+            renderer: function(v,m,r){
+                m.style = "background-color: " + v + ";";
+                return '';
+            },
+            width: 25
+        },{
+            text: 'Code Deployment Schedule',
+            dataIndex: 'CodeDeploymentSchedule'
+        },{
+            text: 'Feature',
+            dataIndex: 'FeatureRef',
+            renderer: function(v,m,r){
+                var link_text = Ext.String.format('{0}: {1}', r.get('FeatureFormattedID'), r.get('FeatureName')); 
+                if (v){
+                    return Rally.nav.DetailLink.getLink({record: v, text: link_text});
+                }
+                return link_text;
+            },
+            flex: 1
+        },{
+            text: 'Blocker Reasons',
+            dataIndex: 'BlockerReasons',
+            flex: 1
+        },{
+            text: 'Blocker Date',
+            dataIndex: 'BlockerDate'
+        },{
+            text: 'Blocker Owner',
+            dataIndex: 'BlockerOwner',
+            flex: 1
+        },{
+            text: 'Comments',
+            dataIndex: 'Comments',
+            flex: 1
+        }];
+    },  
+    _fetchChildren: function(featureRecords){
+        var deferred = Ext.create('Deft.Deferred');
+        this.logger.log('_fetchChildren',featureRecords);
+        
+        var fetch = this.childrenFetchFields;
+        var find = {
+                '_TypeHierarchy': {$in: ['HierarchicalRequirement']},
+                '__At': "current",
+                'Blocked': true
+        }; 
+        
+        var object_ids = _.map(featureRecords, function(f){return f.get('ObjectID');});
+        
+        var chunker = Ext.create('Rally.technicalservices.data.Chunker',{
+            fetch: fetch,
+            find: find,
+            chunkField: '_ItemHierarchy',
+            chunkOids: object_ids    
+        });
+        chunker.load().then({
+            scope: this,
+            success: function(records){
+                this.logger.log('Chunking complete', records);
+                var models = this._createModels(featureRecords, records);
+                deferred.resolve(models);
+            }
+        });
+        return deferred;  
+    },
+    _createModels: function(featureRecords, records){
+
+        var models = []; 
+        Ext.each(featureRecords, function(f){
+            var feature_oid = f.get('ObjectID');
+            var blocked_children = [];  
+            Ext.each(records, function(r){
+                if (Ext.Array.contains(r.get('_ItemHierarchy'),feature_oid)){
+                    blocked_children.push(r);
+                }
+            });
+            var model = Ext.create('Rally.technicalservices.data.FeatureStatusModel',{
+                ObjectID: feature_oid,
+                FeatureRef: f.get('_ref'),
+                FeatureStatus: f.get('DisplayColor') || '#C0C0C0',
+                CodeDeploymentSchedule: f.get('c_CodeDeploymentSchedule'),
+                FeatureFormattedID: f.get('FormattedID'),
+                FeatureName: f.get('Name'),
+                BlockedChildren: blocked_children,  
+                Comments: f.get('Notes')
+            });
+            models.push(model);
+        }, this);
+        return models; 
+    },
+    _fetchFeatures: function(releaseRef){
+        var deferred = Ext.create('Deft.Deferred');
+        Ext.create('Rally.data.wsapi.Store',{
+            fetch: this.featureFetchFields,
+            model: this.featureModel,
+            limit: 'Infinity',
+            filters: [{
+                property: 'Release',
+                value: releaseRef
+            }],
+            autoLoad: true,
+            context: {project: this.getContext().getProjectRef(), projectScopeDown: this.getContext().getProjectScopeDown()},
+            listeners: {
+                scope: this,
+                load: function(store, records, success){
+                    this.logger.log('_fetchFeatures load',records.length, success);
+                    deferred.resolve(records);
+                }
+            }
+        });
+        return deferred;
+    }
+    
+});
+            
+               Rally.launchApp('CustomApp', {
+                   name: 'Feature Status Report'
+               });
+        });
+    </script>
+    
+    <style type="text/css">
+
+.app {
+}
+.tsinfolink {
+    position:absolute;
+    right:0px;
+    width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    text-align: center;
+    color: white;
+    background: #C0C0C0;
+    border-style: solid;
+    border-width: 1px;
+    margin-top: 25px;
+    margin-right: 5px;
+    cursor: pointer;
+}
+    </style>
+
+</head>
+<body></body>
+</html>
