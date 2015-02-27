@@ -49,23 +49,7 @@ Ext.define('Rally.technicalservices.data.FeatureStatusModel',{
                      });
                      return blocked_date;  
                  }
-             }],
-             getHeaderRow: function(){
-                 return Ext.String.format('<tr><td>Status</td><td>Code Deployment Schedule</td><td>Feature</td><td>Blocker Reasons</td><td>Blocker Date</td><td>Blocker Owner</td><td>Comments</td></tr>');
-             },
-             getHtmlRow: function(){
-                 return Ext.String.format('<tr><td style="background-color:{0}"></td><td>{1}</td><td>{2}</td><td style="mso-data-placement:same-cell;">{3}</td><td style="mso-data-placement:same-cell;">{4}</td><td style="mso-data-placement:same-cell;">{5}</td><td style="mso-data-placement:same-cell;">{6}</td></tr>',
-                         this.get('FeatureStatus'),
-                         this.get('CodeDeploymentSchedule'),
-                         this.get('FormattedFeature'),
-                         this.get('BlockerReasons'),
-                         this.get('BlockerDate'),
-                         this.get('BlockerOwner'),
-                         this.get('Comments'));
-             },
-             getXMLHeader: function(){},
-             getXMLRow: function(){}
-             
+             }]
              
              /**
               * 
