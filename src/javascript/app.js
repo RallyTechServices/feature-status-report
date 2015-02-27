@@ -8,9 +8,9 @@ Ext.define('CustomApp', {
         {xtype:'tsinfolink'}
     ],
     featureModel: 'PortfolioItem/Feature',
-    featureFetchFields: ['FormattedID','Name','c_CodeDeploymentSchedule','Notes','DisplayColor'],
+    featureFetchFields: ['FormattedID','Name','c_CodeDeploymentSchedule','Notes','DisplayColor','Discussion'],
     childrenFetchFields: ['FormattedID','Name','_ItemHierarchy','Blocked','BlockedReason','c_BlockerCreationDate','c_BlockerOwnerFirstLast'],
-    
+    releaseField: 'c_CodeDeploymentSchedule',
     launch: function() {
         this._initialize();
     },
@@ -36,58 +36,51 @@ Ext.define('CustomApp', {
         this.down('#selection_box').add({
             xtype: 'rallybutton',
             text: 'Export',
+            itemId: 'btn-export',
             scope: this,
             margin: margin,
+            disabled: true,
             handler: this._export
         });
     },
     _export: function(){
         var store = this.down('#grd-report').getStore(); 
         this.logger.log('_export', store.getData());
+        var xml_text = '', style_xml = '';
+        var counter = 0; 
         
-        var xml_text = '';
-        
-        var html_text = '';
         Ext.each(this.exportData, function(r){
-//            if (xml_text.length == 0){
-//                xml_text = r.getHeaderRow();  
-//            }
+            counter++;
+            style_xml +=  Ext.String.format('<ss:Style ss:ID="s{0}"> <ss:Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1" /><ss:Interior ss:Color="{1}" ss:Pattern="Solid"/></ss:Style>',counter, r.get('FeatureStatus'));
             
-            var blocker_reasons = r.get('BlockerReasons').replace('<br/>',' | ','g');
-            var blocker_owner = r.get('BlockerOwner').replace('<br/>',' | ','g');
-            var blocker_dates = r.get('BlockerDate').replace('<br/>',' | ','g');
-
-            html_text += Ext.String.format('<table><tr><td style="background-color:{0}"></td>' +
-                    '<td>{1}</td>' +
-                    '<td>{2}</td>' +
-                    '<td>{3}</td>' +
-                    '<td>{4}</td>' +
-                    '<td>{5}</td>' +
-                    '<td>{6}</td>' +
-                    '</tr></table>',r.get('FeatureStatus'),
-                    r.get('CodeDeploymentSchedule'),r.get('FormattedFeature'),blocker_reasons,blocker_dates, 
-                    blocker_owner, 
-                    r.get('Comments'));
             
-            xml_text += Ext.String.format('<ss:Row><ss:Cell><ss:Data ss:Type="String">{0}</ss:Data></ss:Cell>' +
+            var blocker_reasons = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerReasons').replace('<br/>','|','g')).replace('<br/>','|','g');
+            var blocker_owner = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerOwner').replace('<br/>','|','g')).replace('<br/>','|','g'); //.replace('<br/>','&#10;','g'));
+            var blocker_dates = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerDate').replace('<br/>','|','g')).replace('<br/>','|','g');
+            var feature = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('FormattedFeature'));
+            var comments = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('Comments')).replace('<br/>','|','g');
+            var cd_schedule = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('CodeDeploymentSchedule'));
+            
+            xml_text += Ext.String.format('<ss:Row><ss:Cell ss:StyleID="s{0}"><ss:Data ss:Type="String"></ss:Data></ss:Cell>' +
                     '<ss:Cell><ss:Data ss:Type="String">{1}</ss:Data></ss:Cell>' +
                     '<ss:Cell><ss:Data ss:Type="String">{2}</ss:Data></ss:Cell>' +
                     '<ss:Cell><ss:Data ss:Type="String">{3}</ss:Data></ss:Cell>' +
                     '<ss:Cell><ss:Data ss:Type="String">{4}</ss:Data></ss:Cell>' +
                     '<ss:Cell><ss:Data ss:Type="String">{5}</ss:Data></ss:Cell>' +
                     '<ss:Cell><ss:Data ss:Type="String">{6}</ss:Data></ss:Cell>' +
-                    '</ss:Row>',r.get('FeatureStatus'),
-                    r.get('CodeDeploymentSchedule'),r.get('FormattedFeature'),blocker_reasons,blocker_dates, 
+                    '</ss:Row>',counter,
+                    cd_schedule,feature,blocker_reasons,blocker_dates, 
                     blocker_owner, 
-                    r.get('Comments'));
+                    comments);
         });
         
 
 
         var text = Ext.String.format('<?xml version="1.0"?>' +
         '<ss:Workbook xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">' +
+        '<ss:Styles>{0}</ss:Styles>' +
         '<ss:Worksheet ss:Name="' + this.getContext().getProject().Name + '">' +
-        '<ss:Table>{0}</ss:Table></ss:Worksheet></ss:Workbook>',xml_text);
+        '<ss:Table>{1}</ss:Table></ss:Worksheet></ss:Workbook>',style_xml, xml_text);
         console.log(text);
         
 //        Rally.technicalservices.FileUtilities.saveTextAsFile(html_text, 'features.html');
@@ -97,7 +90,9 @@ Ext.define('CustomApp', {
     },
     _run: function(){
         var release = this.down('#cb-release').getValue();
+        this.logger.log('_run');
         
+        this._enableUI(false);
         this._fetchFeatures(release).then({
             scope: this,
             success: function(featureRecords){
@@ -107,10 +102,15 @@ Ext.define('CustomApp', {
                         this.exportData = data;  
                         var store = this._buildDataStore(data);
                         this._buildGrid(store);
+                        this._enableUI(true);
                     }
                 });
             }
         });
+    },
+    _enableUI: function(enable){
+        this.setLoading(!enable);
+        this.down('#btn-export').setDisabled(!enable)
     },
     _buildDataStore: function(data){
        this.logger.log('_buildDataStore',data);
@@ -141,7 +141,7 @@ Ext.define('CustomApp', {
             width: 25
         },{
             text: 'Code Deployment Schedule',
-            dataIndex: 'CodeDeploymentSchedule'
+            dataIndex: 'c_CodeDeploymentSchedule'
         },{
             text: 'Feature',
             dataIndex: 'FeatureRef',
@@ -172,7 +172,7 @@ Ext.define('CustomApp', {
     },  
     _fetchChildren: function(featureRecords){
         var deferred = Ext.create('Deft.Deferred');
-        this.logger.log('_fetchChildren',featureRecords);
+        this.logger.log('_fetchChildren',featureRecords.features, featureRecords.discussions);
         
         var fetch = this.childrenFetchFields;
         var find = {
@@ -181,7 +181,7 @@ Ext.define('CustomApp', {
                 'Blocked': true
         }; 
         
-        var object_ids = _.map(featureRecords, function(f){return f.get('ObjectID');});
+        var object_ids = _.map(featureRecords.features, function(f){return f.get('ObjectID');});
         this.logger.log('_fetchChildren', object_ids.length, object_ids);
         var chunker = Ext.create('Rally.technicalservices.data.Chunker',{
             fetch: fetch,
@@ -201,8 +201,14 @@ Ext.define('CustomApp', {
     },
     _createModels: function(featureRecords, records){
 
+        var discussion_hash = {};
+        Ext.each(featureRecords.discussions, function(d){
+            discussion_hash[d.get('Artifact').ObjectID] = d.get('Text');
+        });
+        
+        
         var models = []; 
-        Ext.each(featureRecords, function(f){
+        Ext.each(featureRecords.features, function(f){
             var feature_oid = f.get('ObjectID');
             var blocked_children = [];  
             Ext.each(records, function(r){
@@ -214,11 +220,11 @@ Ext.define('CustomApp', {
                 ObjectID: feature_oid,
                 FeatureRef: f.get('_ref'),
                 FeatureStatus: f.get('DisplayColor') || '#C0C0C0',
-                CodeDeploymentSchedule: f.get('c_CodeDeploymentSchedule'),
+                CodeDeploymentSchedule: f.get(this.releaseField),
                 FeatureFormattedID: f.get('FormattedID'),
                 FeatureName: f.get('Name'),
                 BlockedChildren: blocked_children,  
-                Comments: f.get('Notes')
+                Comments: discussion_hash[feature_oid] || ''
             });
             models.push(model);
         }, this);
@@ -240,10 +246,47 @@ Ext.define('CustomApp', {
                 scope: this,
                 load: function(store, records, success){
                     this.logger.log('_fetchFeatures load',records.length, success);
-                    deferred.resolve(records);
+                    this._fetchDiscussions(records).then({
+                        scope: this,
+                        success: function(discussions){
+                            deferred.resolve({features: records, discussions: discussions});
+                        }
+                    });
+
                 }
             }
         });
+        return deferred;
+    },
+    _fetchDiscussions: function(records){
+        var deferred = Ext.create('Deft.Deferred');
+        var promises = []; 
+        
+        Ext.each(records, function(r){
+            var discussions = r.get('Discussion').Count;
+            if (discussions > 0){
+                promises.push(r.getCollection('Discussion').load({
+                    fetch: ['Text'],
+                    filters: [{
+                        property: 'PostNumber',
+                        value: discussions - 1 //Get the latest post
+                    }]
+                }));
+            }
+        });
+        
+        if (promises.length > 0){
+            Deft.Promise.all(promises).then({
+                scope: this,
+                success: function(returnVal){
+                    var discussions = _.flatten(returnVal);
+                    this.logger.log('_fetchDiscussions discussions returned', discussions);
+                    deferred.resolve(discussions);
+                }
+            });
+        } else {
+            deferred.resolve([]);
+        }
         return deferred;
     }
     
