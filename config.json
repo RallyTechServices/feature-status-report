@@ -1,7 +1,7 @@
 {
     "name": "Feature Status Report",
-    "className": "CustomApp",
-    "server": "https://rally1.rallydev.com",
-    "sdk": "2.0rc3",
+    "className": "feature-status-report",
+    "server": "https://rally1.rallydev.com/",
+    "sdk": "2.0",
     "apiKey": "_PUT_APIKEY_HERE_"
 }
