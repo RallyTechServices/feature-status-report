@@ -1,78 +1,73 @@
 Ext.define('Rally.technicalservices.data.FeatureStatusModel',{
     extend: 'Ext.data.Model',
-
     emptyString: '(Empty)',
     fields: [
              {name: 'FeatureStatus' },
              {name: 'FeatureRef', type:'string'},
              {name: 'ObjectID', type: 'int'},
-             {name: 'CodeDeploymentSchedule', type: 'string'},
+             {name: 'FeatureTargetSchedule', type: 'string'},
              {name: 'FeatureFormattedID', type: 'string'},
-             {name: 'FeatureName', type:'string'},
-             {name: 'BlockedChildren', type: 'auto'},
-             {name: 'Comments', type:'string'},
-             {name: 'FormattedFeature', type: 'string', 
+             {name: 'FeatureName', type:'string'
+             },{
+                 name: 'BlockedChildren', 
+                 convert: function(v, rec){
+                     var obj_hash = {};
+                     var date_regex = new RegExp(/([0-9]+-[0-9]+-[0-9]+)T[0-9]+:[0-9]+:[0-9]+\.[0-9]+Z/);
+                     Ext.each(v, function(obj){
+                         var obj_hash_code  = JSON.stringify(obj, function(key, value) {
+                             if (key == 'FormattedID'){
+                                 return '';
+                             }
+                             //De-dup dates to the day
+                             var matcher = date_regex.exec(value);
+                             if (matcher && matcher[1]){
+                                 return matcher[1];
+                             }
+                             return value;
+                         });
+                         obj_hash[obj_hash_code] = obj;  
+                     }, this);
+                     console.log('de-dups',obj_hash);
+                     var dedupedObjects = _.values(obj_hash);
+                     return dedupedObjects;
+                 }
+             },{
+                 name: 'Comments',type:'string'},
+             {
+                 name: 'FormattedFeature', 
+                 type: 'string', 
                  convert: function(v, rec){
                      return Ext.String.format('{0}:{1}',rec.get('FeatureFormattedID'), rec.get('FeatureName')); 
                  }
              },
-             {name: 'BlockerReasons', type: 'string', 
+             {
+                 name: 'BlockerReasons', 
                  convert: function(v, rec){
-                     var blocked_reason = '';
-                     Ext.each(rec.get('BlockedChildren'), function(child){
-                         var reason = child.get('BlockedReason') || rec.emptyString;
-                         blocked_reason += reason + '<br/>';
-                     });
-                     return blocked_reason;  
+                     return _.map(rec.get('BlockedChildren'), function(child){return child.BlockedReason || rec.emptyString;});
                  }
               },
-             {name: 'BlockerOwner', type: 'string', 
+             {
+                  name: 'BlockerOwner', 
                   convert: function(v, rec){
-                      var blocked_owner = '';
-                      Ext.each(rec.get('BlockedChildren'), function(child){
-                          var owner = child.get('c_BlockerOwnerFirstLast') || rec.emptyString;
-                          blocked_owner += owner + '<br/>';
-                      });
-                      return blocked_owner;  
+                      return _.map(rec.get('BlockedChildren'), function(child){return child.c_BlockerOwnerFirstLast || rec.emptyString;});
                   }
              },
-             {name: 'BlockerDate', type: 'string', 
+             {
+                 name: 'BlockerDate',  
                  convert: function(v, rec){
-                     var blocked_date = '';
-                     Ext.each(rec.get('BlockedChildren'), function(child){
-                         var date = child.get('c_BlockerCreationDate');
+                     return _.map(rec.get('BlockedChildren'), function(child){
+                         var date = child.c_BlockerCreationDate;
                          if (date){
-                             blocked_date += Rally.util.DateTime.formatWithDefault(Rally.util.DateTime.fromIsoString(date)) + '<br/>';
-                         } else {
-                             blocked_date += rec.emptyString + '<br/>';
+                             return Rally.util.DateTime.formatWithDefault(Rally.util.DateTime.fromIsoString(date));
                          }
-                     });
-                     return blocked_date;  
+                         return rec.emptyString;
+                      });
                  }
+             },{
+               name: 'BlockerArtifact', 
+               convert: function(v, rec){
+                   var objs = rec.get('BlockedChildren');
+                   return _.map(rec.get('BlockedChildren'), function(child){return child.FormattedID || rec.emptyString});
+               }
              }]
-             
-             /**
-              * 
-              * <?xml version="1.0"?>
-<ss:Workbook xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
-    <ss:Worksheet ss:Name="Sheet1">
-        <ss:Table>
-            <ss:Row>
-                <ss:Cell>
-                    <ss:Data ss:Type="String">First Name</ss:Data>
-                </ss:Cell>
-                <ss:Cell>
-                    <ss:Data ss:Type="String">Last Name</ss:Data>
-                </ss:Cell>
-                <ss:Cell>
-                    <ss:Data ss:Type="String">Phone Number</ss:Data>
-                </ss:Cell>
-            </ss:Row>
-        </ss:Table>
-    </ss:Worksheet>
-</ss:Workbook>
-              * 
-              * 
-              * 
-              */
 });

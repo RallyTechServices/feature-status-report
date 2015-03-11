@@ -1,47 +1,68 @@
-Ext.define('CustomApp', {
+Ext.define('feature-status-report', {
     extend: 'Rally.app.App',
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
+    
     items: [
-        {xtype:'container',itemId:'selection_box', layout: {type: 'hbox'}},
+        {xtype:'container',itemId: 'header_box'},
         {xtype:'container',itemId:'display_box'},
         {xtype:'tsinfolink'}
     ],
+    featureTargetScheduleStore: [
+         ['c_FeatureTargetMonth','Feature Target Month'],
+         ['c_CodeDeploymentSchedule','Code Deployment Schedule']
+    ],
+    defaultFeatureTargetField: 'c_CodeDeploymentSchedule',
     featureModel: 'PortfolioItem/Feature',
-    featureFetchFields: ['FormattedID','Name','c_CodeDeploymentSchedule','Notes','DisplayColor','Discussion'],
+    featureFetchFields: ['FormattedID','Name','DisplayColor','Discussion'],
     childrenFetchFields: ['FormattedID','Name','_ItemHierarchy','Blocked','BlockedReason','c_BlockerCreationDate','c_BlockerOwnerFirstLast'],
-    releaseField: 'c_CodeDeploymentSchedule',
+    reportBlockerFields: ['BlockedReason','c_BlockerCreationDate','c_BlockerOwnerFirstLast','FormattedID'],
+    
     launch: function() {
         this._initialize();
     },
     _initialize: function(){
-        this.logger.log('_initialize');
         var margin = 10; 
-        this.down('#selection_box').add({
-            xtype: 'rallyreleasecombobox',
-            itemId: 'cb-release',
-            fieldLabel: 'Release Filter',
-            labelAlign: 'right',
-            width: 250,
-            margin: margin,
-            context: {project: this.getContext().getProjectRef(), projectScopeDown: false}
+
+        this.down('#header_box').add({ 
+            xtype: 'container',
+            layout: {type: 'hbox'},
+            items: [{
+                xtype: 'rallyreleasecombobox',
+                itemId: 'cb-release',
+                fieldLabel: 'Release Filter',
+                labelAlign: 'right',
+                width: 250,
+                margin: margin,
+                context: {project: this.getContext().getProjectRef(), projectScopeDown: false}
+            },{
+               xtype: 'rallycombobox',
+               itemId: 'cb-feature-target-schedule',
+               fieldLabel: 'Feature Target Field',
+               labelAlign: 'right',
+               margin: margin,
+               width: 300,
+               labelWidth: 125,
+               store: this.featureTargetScheduleStore
+            },{
+                xtype: 'rallybutton',
+                text: 'Run',
+                scope: this,
+                margin: margin,
+                handler: this._run
+            },{ 
+                xtype: 'rallybutton',
+                text: 'Export',
+                itemId: 'btn-export',
+                scope: this,
+                margin: margin,
+                disabled: true,
+                handler: this._export
+            }]
         });
-        this.down('#selection_box').add({
-            xtype: 'rallybutton',
-            text: 'Run',
-            scope: this,
-            margin: margin,
-            handler: this._run
-        });
-        this.down('#selection_box').add({
-            xtype: 'rallybutton',
-            text: 'Export',
-            itemId: 'btn-export',
-            scope: this,
-            margin: margin,
-            disabled: true,
-            handler: this._export
-        });
+    },
+    _getFeatureTargetScheduleField: function(){
+        return this.down('#cb-feature-target-schedule').getValue() || this.defaultFeatureTargetField;
     },
     _export: function(){
         var store = this.down('#grd-report').getStore(); 
@@ -49,17 +70,33 @@ Ext.define('CustomApp', {
         var xml_text = '', style_xml = '';
         var counter = 0; 
         
+        //Write headers
+        var headers = ['CodeDeplymentSchedule','FormattedFeature','BlockerReasons','BlockerDate','BlockerOwner','Comments'];
+        var xml_text = Ext.String.format('<ss:Row><ss:Cell><ss:Data ss:Type="String">Status</ss:Data></ss:Cell>' +
+                '<ss:Cell><ss:Data ss:Type="String">{0}</ss:Data></ss:Cell>' +
+                '<ss:Cell><ss:Data ss:Type="String">{1}</ss:Data></ss:Cell>' +
+                '<ss:Cell><ss:Data ss:Type="String">{2}</ss:Data></ss:Cell>' +
+                '<ss:Cell><ss:Data ss:Type="String">{3}</ss:Data></ss:Cell>' +
+                '<ss:Cell><ss:Data ss:Type="String">{4}</ss:Data></ss:Cell>' +
+                '<ss:Cell><ss:Data ss:Type="String">{5}</ss:Data></ss:Cell>' +
+                '</ss:Row>',headers[0],headers[1],headers[2],headers[3],headers[4],headers[5]);
+        
         Ext.each(this.exportData, function(r){
             counter++;
             style_xml +=  Ext.String.format('<ss:Style ss:ID="s{0}"> <ss:Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1" /><ss:Interior ss:Color="{1}" ss:Pattern="Solid"/></ss:Style>',counter, r.get('FeatureStatus'));
             
+            var blocker_reasons = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerReasons')).replace('&lt;br/$gt;','&#13;');
+            blocker_reasons = blocker_reasons.replace('&lt;br/&gt;','&#13;',"g");
             
-            var blocker_reasons = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerReasons').replace('<br/>','|','g')).replace('<br/>','|','g');
-            var blocker_owner = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerOwner').replace('<br/>','|','g')).replace('<br/>','|','g'); //.replace('<br/>','&#10;','g'));
-            var blocker_dates = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerDate').replace('<br/>','|','g')).replace('<br/>','|','g');
+            var blocker_owner = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerOwner')); //.replace('<br/>','&#10;','g'));
+            blocker_owner = blocker_owner.replace('&lt;br/&gt;','&#13;',"g");
+            
+            var blocker_dates = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerDate'));
+            blocker_dates = blocker_dates.replace('&lt;br/&gt;','&#13;',"g");
+
             var feature = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('FormattedFeature'));
-            var comments = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('Comments')).replace('<br/>','|','g');
-            var cd_schedule = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('CodeDeploymentSchedule'));
+            var comments = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('Comments'));
+            var cd_schedule = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('FeatureTargetSchedule'));
             
             xml_text += Ext.String.format('<ss:Row><ss:Cell ss:StyleID="s{0}"><ss:Data ss:Type="String"></ss:Data></ss:Cell>' +
                     '<ss:Cell><ss:Data ss:Type="String">{1}</ss:Data></ss:Cell>' +
@@ -85,18 +122,21 @@ Ext.define('CustomApp', {
         
 //        Rally.technicalservices.FileUtilities.saveTextAsFile(html_text, 'features.html');
  //       html_text = Ext.String.format('<table>{0}</table>', html_text);
-        Rally.technicalservices.FileUtilities.saveTextAsFile(text,'feature-report.html');
+        Rally.technicalservices.FileUtilities.saveHTMLToFile(text,'feature-report.html');
         
     },
+    _getReleaseCombo: function(){
+        return this.down('#cb-release');
+    },
     _run: function(){
-        var release = this.down('#cb-release').getValue();
+        var release = this._getReleaseCombo().getValue();
         this.logger.log('_run');
         
         this._enableUI(false);
         this._fetchFeatures(release).then({
             scope: this,
             success: function(featureRecords){
-                this._fetchChildren(featureRecords).then({
+                this._fetchBlockedChildren(featureRecords).then({
                     scope: this,
                     success: function(data){
                         this.exportData = data;  
@@ -140,8 +180,8 @@ Ext.define('CustomApp', {
             },
             width: 25
         },{
-            text: 'Code Deployment Schedule',
-            dataIndex: 'c_CodeDeploymentSchedule'
+            text: 'Feature Target Schedule',
+            dataIndex: 'FeatureTargetSchedule'
         },{
             text: 'Feature',
             dataIndex: 'FeatureRef',
@@ -156,29 +196,40 @@ Ext.define('CustomApp', {
         },{
             text: 'Blocker Reasons',
             dataIndex: 'BlockerReasons',
-            flex: 1
+            flex: 1,
+            renderer: this._arrayRenderer
         },{
             text: 'Blocker Date',
-            dataIndex: 'BlockerDate'
+            dataIndex: 'BlockerDate',
+                renderer: this._arrayRenderer
         },{
             text: 'Blocker Owner',
             dataIndex: 'BlockerOwner',
-            flex: 1
+            renderer: this._arrayRenderer,
+           flex: 1
         },{
             text: 'Comments',
             dataIndex: 'Comments',
             flex: 1
         }];
     },  
-    _fetchChildren: function(featureRecords){
+    _arrayRenderer: function(v,m,r){
+        console.log('_array',v);
+        if (Array.isArray(v)){
+            return v.join('<br/>');
+        }
+        return v;  
+        
+    },
+    _fetchBlockedChildren: function(featureRecords){
         var deferred = Ext.create('Deft.Deferred');
         this.logger.log('_fetchChildren',featureRecords.features, featureRecords.discussions);
         
         var fetch = this.childrenFetchFields;
         var find = {
-                '_TypeHierarchy': {$in: ['HierarchicalRequirement']},
+                '_TypeHierarchy': {$in: ['HierarchicalRequirement','Defect','Task']},
                 '__At': "current",
-                'Blocked': true
+                'Blocked': true,
         }; 
         
         var object_ids = _.map(featureRecords.features, function(f){return f.get('ObjectID');});
@@ -199,41 +250,60 @@ Ext.define('CustomApp', {
         });
         return deferred;  
     },
-    _createModels: function(featureRecords, records){
-
+    _getDiscussionHash: function(featureRecords){
         var discussion_hash = {};
         Ext.each(featureRecords.discussions, function(d){
             discussion_hash[d.get('Artifact').ObjectID] = d.get('Text');
         });
-        
-        
+        return discussion_hash;  
+    },
+    _getBlockedChildrenForFeatureOid: function(blockedChildrenRecords, featureOid){
+        var blockerFields = this.reportBlockerFields; 
+        var blocked_children = [];  
+        Ext.each(blockedChildrenRecords, function(r){
+            
+            if (Ext.Array.contains(r.get('_ItemHierarchy'),featureOid)){
+                var obj = r.getData(); 
+                var child = _.pick(obj, blockerFields);
+                blocked_children.push(child);                      
+            }
+        }, this);
+        return blocked_children;
+    },
+    /**
+     * Called by _fetchBlockedChildren;  Creates the feature-status-model objects
+     * 
+     */
+    _createModels: function(featureRecords, blockedChildRecords){
+
+        var discussion_hash = this._getDiscussionHash(featureRecords);
+        var featureTargetScheduleField = this._getFeatureTargetScheduleField();
         var models = []; 
         Ext.each(featureRecords.features, function(f){
             var feature_oid = f.get('ObjectID');
-            var blocked_children = [];  
-            Ext.each(records, function(r){
-                if (Ext.Array.contains(r.get('_ItemHierarchy'),feature_oid)){
-                    blocked_children.push(r);
-                }
-            });
+            var blockedChildren = this._getBlockedChildrenForFeatureOid(blockedChildRecords, feature_oid);
+
             var model = Ext.create('Rally.technicalservices.data.FeatureStatusModel',{
                 ObjectID: feature_oid,
                 FeatureRef: f.get('_ref'),
                 FeatureStatus: f.get('DisplayColor') || '#C0C0C0',
-                CodeDeploymentSchedule: f.get(this.releaseField),
+                FeatureTargetSchedule: f.get(featureTargetScheduleField),
                 FeatureFormattedID: f.get('FormattedID'),
                 FeatureName: f.get('Name'),
-                BlockedChildren: blocked_children,  
+                BlockedChildren: blockedChildren,  
                 Comments: discussion_hash[feature_oid] || ''
             });
             models.push(model);
+            
         }, this);
         return models; 
     },
     _fetchFeatures: function(releaseRef){
         var deferred = Ext.create('Deft.Deferred');
+        var fetch = Ext.Array.merge(this.featureFetchFields, [this._getFeatureTargetScheduleField()]);
+        this.logger.log('_fetchFeatures',fetch);
         Ext.create('Rally.data.wsapi.Store',{
-            fetch: this.featureFetchFields,
+            fetch: fetch,
             model: this.featureModel,
             limit: 'Infinity',
             filters: [{

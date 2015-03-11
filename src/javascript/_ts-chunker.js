@@ -32,6 +32,7 @@ Ext.define('Rally.technicalservices.data.Chunker',{
         Deft.Promise.all(promises).then({
             scope: this,
             success: function(records) {
+                console.log('chunk rcors', records);
                 var data = _.flatten(records);
                 deferred.resolve(data);
            },

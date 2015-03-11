@@ -2,19 +2,439 @@
 <html>
 <head>
     <title>Feature Status Report</title>
-    <!--  (c) 2014 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Thu Feb 26 2015 17:09:00 GMT-0800 (PST) -->
+    <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
+    <!--  Build Date: Wed Mar 11 2015 11:32:50 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Feb 26 2015 17:09:00 GMT-0800 (PST)";
-        var CHECKSUM = 12701585836;
+        var APP_BUILD_DATE = "Wed Mar 11 2015 11:32:50 GMT-0700 (PDT)";
+        var CHECKSUM = 38542474119;
     </script>
     
-    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
+    <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
 
     <script type="text/javascript">
         Rally.onReady(function() {
              
+/* Blob.js
+ * A Blob implementation.
+ * 2014-05-31
+ * 
+ * By Eli Grey, http://eligrey.com
+ * By Devin Samarin, https://github.com/eboyjr
+ * License: X11/MIT
+ *   See https://github.com/eligrey/Blob.js/blob/master/LICENSE.md
+ */
+
+/*global self, unescape */
+/*jslint bitwise: true, regexp: true, confusion: true, es5: true, vars: true, white: true,
+  plusplus: true */
+
+/*! @source http://purl.eligrey.com/github/Blob.js/blob/master/Blob.js */
+
+(function (view) {
+    "use strict";
+
+    view.URL = view.URL || view.webkitURL;
+
+    if (view.Blob && view.URL) {
+        try {
+            new Blob;
+            return;
+        } catch (e) {}
+    }
+
+    // Internally we use a BlobBuilder implementation to base Blob off of
+    // in order to support older browsers that only have BlobBuilder
+    var BlobBuilder = view.BlobBuilder || view.WebKitBlobBuilder || view.MozBlobBuilder || (function(view) {
+        var
+              get_class = function(object) {
+                return Object.prototype.toString.call(object).match(/^\[object\s(.*)\]$/)[1];
+            }
+            , FakeBlobBuilder = function BlobBuilder() {
+                this.data = [];
+            }
+            , FakeBlob = function Blob(data, type, encoding) {
+                this.data = data;
+                this.size = data.length;
+                this.type = type;
+                this.encoding = encoding;
+            }
+            , FBB_proto = FakeBlobBuilder.prototype
+            , FB_proto = FakeBlob.prototype
+            , FileReaderSync = view.FileReaderSync
+            , FileException = function(type) {
+                this.code = this[this.name = type];
+            }
+            , file_ex_codes = (
+                  "NOT_FOUND_ERR SECURITY_ERR ABORT_ERR NOT_READABLE_ERR ENCODING_ERR "
+                + "NO_MODIFICATION_ALLOWED_ERR INVALID_STATE_ERR SYNTAX_ERR"
+            ).split(" ")
+            , file_ex_code = file_ex_codes.length
+            , real_URL = view.URL || view.webkitURL || view
+            , real_create_object_URL = real_URL.createObjectURL
+            , real_revoke_object_URL = real_URL.revokeObjectURL
+            , URL = real_URL
+            , btoa = view.btoa
+            , atob = view.atob
+            
+            , ArrayBuffer = view.ArrayBuffer
+            , Uint8Array = view.Uint8Array
+        ;
+        FakeBlob.fake = FB_proto.fake = true;
+        while (file_ex_code--) {
+            FileException.prototype[file_ex_codes[file_ex_code]] = file_ex_code + 1;
+        }
+        if (!real_URL.createObjectURL) {
+            URL = view.URL = {};
+        }
+        URL.createObjectURL = function(blob) {
+            var
+                  type = blob.type
+                , data_URI_header
+            ;
+            if (type === null) {
+                type = "application/octet-stream";
+            }
+            if (blob instanceof FakeBlob) {
+                data_URI_header = "data:" + type;
+                if (blob.encoding === "base64") {
+                    return data_URI_header + ";base64," + blob.data;
+                } else if (blob.encoding === "URI") {
+                    return data_URI_header + "," + decodeURIComponent(blob.data);
+                } if (btoa) {
+                    return data_URI_header + ";base64," + btoa(blob.data);
+                } else {
+                    return data_URI_header + "," + encodeURIComponent(blob.data);
+                }
+            } else if (real_create_object_URL) {
+                return real_create_object_URL.call(real_URL, blob);
+            }
+        };
+        URL.revokeObjectURL = function(object_URL) {
+            if (object_URL.substring(0, 5) !== "data:" && real_revoke_object_URL) {
+                real_revoke_object_URL.call(real_URL, object_URL);
+            }
+        };
+        FBB_proto.append = function(data/*, endings*/) {
+            var bb = this.data;
+            // decode data to a binary string
+            if (Uint8Array && (data instanceof ArrayBuffer || data instanceof Uint8Array)) {
+                var
+                      str = ""
+                    , buf = new Uint8Array(data)
+                    , i = 0
+                    , buf_len = buf.length
+                ;
+                for (; i < buf_len; i++) {
+                    str += String.fromCharCode(buf[i]);
+                }
+                bb.push(str);
+            } else if (get_class(data) === "Blob" || get_class(data) === "File") {
+                if (FileReaderSync) {
+                    var fr = new FileReaderSync;
+                    bb.push(fr.readAsBinaryString(data));
+                } else {
+                    // async FileReader won't work as BlobBuilder is sync
+                    throw new FileException("NOT_READABLE_ERR");
+                }
+            } else if (data instanceof FakeBlob) {
+                if (data.encoding === "base64" && atob) {
+                    bb.push(atob(data.data));
+                } else if (data.encoding === "URI") {
+                    bb.push(decodeURIComponent(data.data));
+                } else if (data.encoding === "raw") {
+                    bb.push(data.data);
+                }
+            } else {
+                if (typeof data !== "string") {
+                    data += ""; // convert unsupported types to strings
+                }
+                // decode UTF-16 to binary string
+                bb.push(unescape(encodeURIComponent(data)));
+            }
+        };
+        FBB_proto.getBlob = function(type) {
+            if (!arguments.length) {
+                type = null;
+            }
+            return new FakeBlob(this.data.join(""), type, "raw");
+        };
+        FBB_proto.toString = function() {
+            return "[object BlobBuilder]";
+        };
+        FB_proto.slice = function(start, end, type) {
+            var args = arguments.length;
+            if (args < 3) {
+                type = null;
+            }
+            return new FakeBlob(
+                  this.data.slice(start, args > 1 ? end : this.data.length)
+                , type
+                , this.encoding
+            );
+        };
+        FB_proto.toString = function() {
+            return "[object Blob]";
+        };
+        FB_proto.close = function() {
+            this.size = 0;
+            delete this.data;
+        };
+        return FakeBlobBuilder;
+    }(view));
+
+    view.Blob = function Blob(blobParts, options) {
+        var type = options ? (options.type || "") : "";
+        var builder = new BlobBuilder();
+        if (blobParts) {
+            for (var i = 0, len = blobParts.length; i < len; i++) {
+                builder.append(blobParts[i]);
+            }
+        }
+        return builder.getBlob(type);
+    };
+}(typeof self !== "undefined" && self || typeof window !== "undefined" && window || this.content || this));
+/* FileSaver.js
+ *  A saveAs() FileSaver implementation.
+ *  2014-05-27
+ *
+ *  By Eli Grey, http://eligrey.com
+ *  License: X11/MIT
+ *    See https://github.com/eligrey/FileSaver.js/blob/master/LICENSE.md
+ */
+
+/*global self */
+/*jslint bitwise: true, indent: 4, laxbreak: true, laxcomma: true, smarttabs: true, plusplus: true */
+
+/*! @source http://purl.eligrey.com/github/FileSaver.js/blob/master/FileSaver.js */
+
+var saveAs = saveAs
+  // IE 10+ (native saveAs)
+  || (typeof navigator !== "undefined" &&
+      navigator.msSaveOrOpenBlob && navigator.msSaveOrOpenBlob.bind(navigator))
+  // Everyone else
+  || (function(view) {
+    "use strict";
+    // IE <10 is explicitly unsupported
+    if (typeof navigator !== "undefined" &&
+        /MSIE [1-9]\./.test(navigator.userAgent)) {
+        return;
+    }
+    var
+          doc = view.document
+          // only get URL when necessary in case Blob.js hasn't overridden it yet
+        , get_URL = function() {
+            return view.URL || view.webkitURL || view;
+        }
+        , save_link = doc.createElementNS("http://www.w3.org/1999/xhtml", "a")
+        , can_use_save_link = !view.externalHost && "download" in save_link
+        , click = function(node) {
+            var event = doc.createEvent("MouseEvents");
+            event.initMouseEvent(
+                "click", true, false, view, 0, 0, 0, 0, 0
+                , false, false, false, false, 0, null
+            );
+            node.dispatchEvent(event);
+        }
+        , webkit_req_fs = view.webkitRequestFileSystem
+        , req_fs = view.requestFileSystem || webkit_req_fs || view.mozRequestFileSystem
+        , throw_outside = function(ex) {
+            (view.setImmediate || view.setTimeout)(function() {
+                throw ex;
+            }, 0);
+        }
+        , force_saveable_type = "application/octet-stream"
+        , fs_min_size = 0
+        , deletion_queue = []
+        , process_deletion_queue = function() {
+            var i = deletion_queue.length;
+            while (i--) {
+                var file = deletion_queue[i];
+                if (typeof file === "string") { // file is an object URL
+                    get_URL().revokeObjectURL(file);
+                } else { // file is a File
+                    file.remove();
+                }
+            }
+            deletion_queue.length = 0; // clear queue
+        }
+        , dispatch = function(filesaver, event_types, event) {
+            event_types = [].concat(event_types);
+            var i = event_types.length;
+            while (i--) {
+                var listener = filesaver["on" + event_types[i]];
+                if (typeof listener === "function") {
+                    try {
+                        listener.call(filesaver, event || filesaver);
+                    } catch (ex) {
+                        throw_outside(ex);
+                    }
+                }
+            }
+        }
+        , FileSaver = function(blob, name) {
+            // First try a.download, then web filesystem, then object URLs
+            var
+                  filesaver = this
+                , type = blob.type
+                , blob_changed = false
+                , object_url
+                , target_view
+                , get_object_url = function() {
+                    var object_url = get_URL().createObjectURL(blob);
+                    deletion_queue.push(object_url);
+                    return object_url;
+                }
+                , dispatch_all = function() {
+                    dispatch(filesaver, "writestart progress write writeend".split(" "));
+                }
+                // on any filesys errors revert to saving with object URLs
+                , fs_error = function() {
+                    // don't create more object URLs than needed
+                    if (blob_changed || !object_url) {
+                        object_url = get_object_url(blob);
+                    }
+                    if (target_view) {
+                        target_view.location.href = object_url;
+                    } else {
+                        window.open(object_url, "_blank");
+                    }
+                    filesaver.readyState = filesaver.DONE;
+                    dispatch_all();
+                }
+                , abortable = function(func) {
+                    return function() {
+                        if (filesaver.readyState !== filesaver.DONE) {
+                            return func.apply(this, arguments);
+                        }
+                    };
+                }
+                , create_if_not_found = {create: true, exclusive: false}
+                , slice
+            ;
+            filesaver.readyState = filesaver.INIT;
+            if (!name) {
+                name = "download";
+            }
+            if (can_use_save_link) {
+                object_url = get_object_url(blob);
+                save_link.href = object_url;
+                save_link.download = name;
+                click(save_link);
+                filesaver.readyState = filesaver.DONE;
+                dispatch_all();
+                return;
+            }
+            // Object and web filesystem URLs have a problem saving in Google Chrome when
+            // viewed in a tab, so I force save with application/octet-stream
+            // http://code.google.com/p/chromium/issues/detail?id=91158
+            if (view.chrome && type && type !== force_saveable_type) {
+                slice = blob.slice || blob.webkitSlice;
+                blob = slice.call(blob, 0, blob.size, force_saveable_type);
+                blob_changed = true;
+            }
+            // Since I can't be sure that the guessed media type will trigger a download
+            // in WebKit, I append .download to the filename.
+            // https://bugs.webkit.org/show_bug.cgi?id=65440
+            if (webkit_req_fs && name !== "download") {
+                name += ".download";
+            }
+            if (type === force_saveable_type || webkit_req_fs) {
+                target_view = view;
+            }
+            if (!req_fs) {
+                fs_error();
+                return;
+            }
+            fs_min_size += blob.size;
+            req_fs(view.TEMPORARY, fs_min_size, abortable(function(fs) {
+                fs.root.getDirectory("saved", create_if_not_found, abortable(function(dir) {
+                    var save = function() {
+                        dir.getFile(name, create_if_not_found, abortable(function(file) {
+                            file.createWriter(abortable(function(writer) {
+                                writer.onwriteend = function(event) {
+                                    target_view.location.href = file.toURL();
+                                    deletion_queue.push(file);
+                                    filesaver.readyState = filesaver.DONE;
+                                    dispatch(filesaver, "writeend", event);
+                                };
+                                writer.onerror = function() {
+                                    var error = writer.error;
+                                    if (error.code !== error.ABORT_ERR) {
+                                        fs_error();
+                                    }
+                                };
+                                "writestart progress write abort".split(" ").forEach(function(event) {
+                                    writer["on" + event] = filesaver["on" + event];
+                                });
+                                writer.write(blob);
+                                filesaver.abort = function() {
+                                    writer.abort();
+                                    filesaver.readyState = filesaver.DONE;
+                                };
+                                filesaver.readyState = filesaver.WRITING;
+                            }), fs_error);
+                        }), fs_error);
+                    };
+                    dir.getFile(name, {create: false}, abortable(function(file) {
+                        // delete file if it already exists
+                        file.remove();
+                        save();
+                    }), abortable(function(ex) {
+                        if (ex.code === ex.NOT_FOUND_ERR) {
+                            save();
+                        } else {
+                            fs_error();
+                        }
+                    }));
+                }), fs_error);
+            }), fs_error);
+        }
+        , FS_proto = FileSaver.prototype
+        , saveAs = function(blob, name) {
+            return new FileSaver(blob, name);
+        }
+    ;
+    FS_proto.abort = function() {
+        var filesaver = this;
+        filesaver.readyState = filesaver.DONE;
+        dispatch(filesaver, "abort");
+    };
+    FS_proto.readyState = FS_proto.INIT = 0;
+    FS_proto.WRITING = 1;
+    FS_proto.DONE = 2;
+
+    FS_proto.error =
+    FS_proto.onwritestart =
+    FS_proto.onprogress =
+    FS_proto.onwrite =
+    FS_proto.onabort =
+    FS_proto.onerror =
+    FS_proto.onwriteend =
+        null;
+
+    view.addEventListener("unload", process_deletion_queue, false);
+    saveAs.unload = function() {
+        process_deletion_queue();
+        view.removeEventListener("unload", process_deletion_queue, false);
+    };
+    return saveAs;
+}(
+       typeof self !== "undefined" && self
+    || typeof window !== "undefined" && window
+    || this.content
+));
+// `self` is undefined in Firefox for Android content script context
+// while `this` is nsIContentFrameMessageManager
+// with an attribute `content` that corresponds to the window
+
+if (typeof module !== "undefined" && module !== null) {
+  module.exports = saveAs;
+} else if ((typeof define !== "undefined" && define !== null) && (define.amd != null)) {
+  define([], function() {
+    return saveAs;
+  });
+}
 /**
  * A link that pops up a version dialog box
  */
@@ -172,6 +592,7 @@ Ext.define('Rally.technicalservices.data.Chunker',{
         Deft.Promise.all(promises).then({
             scope: this,
             success: function(records) {
+                console.log('chunk rcors', records);
                 var data = _.flatten(records);
                 deferred.resolve(data);
            },
@@ -204,86 +625,88 @@ Ext.define('Rally.technicalservices.data.Chunker',{
 });
 Ext.define('Rally.technicalservices.data.FeatureStatusModel',{
     extend: 'Ext.data.Model',
-
     emptyString: '(Empty)',
     fields: [
              {name: 'FeatureStatus' },
              {name: 'FeatureRef', type:'string'},
              {name: 'ObjectID', type: 'int'},
-             {name: 'CodeDeploymentSchedule', type: 'string'},
+             {name: 'FeatureTargetSchedule', type: 'string'},
              {name: 'FeatureFormattedID', type: 'string'},
-             {name: 'FeatureName', type:'string'},
-             {name: 'BlockedChildren', type: 'auto'},
-             {name: 'Comments', type:'string'},
-             {name: 'FormattedFeature', type: 'string', 
+             {name: 'FeatureName', type:'string'
+             },{
+                 name: 'BlockedChildren', 
+                 convert: function(v, rec){
+                     var obj_hash = {};
+                     var date_regex = new RegExp(/([0-9]+-[0-9]+-[0-9]+)T[0-9]+:[0-9]+:[0-9]+\.[0-9]+Z/);
+                     Ext.each(v, function(obj){
+                         var obj_hash_code  = JSON.stringify(obj, function(key, value) {
+                             if (key == 'FormattedID'){
+                                 return '';
+                             }
+                             //De-dup dates to the day
+                             var matcher = date_regex.exec(value);
+                             if (matcher && matcher[1]){
+                                 return matcher[1];
+                             }
+                             return value;
+                         });
+                         obj_hash[obj_hash_code] = obj;  
+                     }, this);
+                     console.log('de-dups',obj_hash);
+                     var dedupedObjects = _.values(obj_hash);
+                     return dedupedObjects;
+                 }
+             },{
+                 name: 'Comments',type:'string'},
+             {
+                 name: 'FormattedFeature', 
+                 type: 'string', 
                  convert: function(v, rec){
                      return Ext.String.format('{0}:{1}',rec.get('FeatureFormattedID'), rec.get('FeatureName')); 
                  }
              },
-             {name: 'BlockerReasons', type: 'string', 
+             {
+                 name: 'BlockerReasons', 
                  convert: function(v, rec){
-                     var blocked_reason = '';
-                     Ext.each(rec.get('BlockedChildren'), function(child){
-                         var reason = child.get('BlockedReason') || rec.emptyString;
-                         blocked_reason += reason + '<br/>';
-                     });
-                     return blocked_reason;  
+                     return _.map(rec.get('BlockedChildren'), function(child){return child.BlockedReason || rec.emptyString;});
                  }
               },
-             {name: 'BlockerOwner', type: 'string', 
+             {
+                  name: 'BlockerOwner', 
                   convert: function(v, rec){
-                      var blocked_owner = '';
-                      Ext.each(rec.get('BlockedChildren'), function(child){
-                          var owner = child.get('c_BlockerOwnerFirstLast') || rec.emptyString;
-                          blocked_owner += owner + '<br/>';
-                      });
-                      return blocked_owner;  
+                      return _.map(rec.get('BlockedChildren'), function(child){return child.c_BlockerOwnerFirstLast || rec.emptyString;});
                   }
              },
-             {name: 'BlockerDate', type: 'string', 
+             {
+                 name: 'BlockerDate',  
                  convert: function(v, rec){
-                     var blocked_date = '';
-                     Ext.each(rec.get('BlockedChildren'), function(child){
-                         var date = child.get('c_BlockerCreationDate');
+                     return _.map(rec.get('BlockedChildren'), function(child){
+                         var date = child.c_BlockerCreationDate;
                          if (date){
-                             blocked_date += Rally.util.DateTime.formatWithDefault(Rally.util.DateTime.fromIsoString(date)) + '<br/>';
-                         } else {
-                             blocked_date += rec.emptyString + '<br/>';
+                             return Rally.util.DateTime.formatWithDefault(Rally.util.DateTime.fromIsoString(date));
                          }
-                     });
-                     return blocked_date;  
+                         return rec.emptyString;
+                      });
                  }
+             },{
+               name: 'BlockerArtifact', 
+               convert: function(v, rec){
+                   var objs = rec.get('BlockedChildren');
+                   return _.map(rec.get('BlockedChildren'), function(child){return child.FormattedID || rec.emptyString});
+               }
              }]
-             
-             /**
-              * 
-              * <?xml version="1.0"?>
-<ss:Workbook xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
-    <ss:Worksheet ss:Name="Sheet1">
-        <ss:Table>
-            <ss:Row>
-                <ss:Cell>
-                    <ss:Data ss:Type="String">First Name</ss:Data>
-                </ss:Cell>
-                <ss:Cell>
-                    <ss:Data ss:Type="String">Last Name</ss:Data>
-                </ss:Cell>
-                <ss:Cell>
-                    <ss:Data ss:Type="String">Phone Number</ss:Data>
-                </ss:Cell>
-            </ss:Row>
-        </ss:Table>
-    </ss:Worksheet>
-</ss:Workbook>
-              * 
-              * 
-              * 
-              */
 });
 Ext.define('Rally.technicalservices.FileUtilities', {
     singleton: true,
     logger: new Rally.technicalservices.Logger(),
-    
+    saveHTMLToFile:function(html,file_name,type_object){
+        if (type_object == undefined){
+            type_object = {type:'text/html;charset=utf-8'};
+        }
+        var blob = new Blob([html],type_object);
+        saveAs(blob,file_name);
+},
+
     saveTextAsFile: function(textToWrite, fileName)
     {
         var textFileAsBlob = new Blob([textToWrite], {type:'text/plain'});
@@ -387,50 +810,71 @@ Ext.define('Rally.technicalservices.FileUtilities', {
     
     //https://msdn.microsoft.com/en-us/library/ie/hh673542(v=vs.85).aspx
 });
-Ext.define('CustomApp', {
+Ext.define('feature-status-report', {
     extend: 'Rally.app.App',
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
+    
     items: [
-        {xtype:'container',itemId:'selection_box', layout: {type: 'hbox'}},
+        {xtype:'container',itemId: 'header_box'},
         {xtype:'container',itemId:'display_box'},
         {xtype:'tsinfolink'}
     ],
+    featureTargetScheduleStore: [
+         ['c_FeatureTargetMonth','Feature Target Month'],
+         ['c_CodeDeploymentSchedule','Code Deployment Schedule']
+    ],
+    defaultFeatureTargetField: 'c_CodeDeploymentSchedule',
     featureModel: 'PortfolioItem/Feature',
-    featureFetchFields: ['FormattedID','Name','c_CodeDeploymentSchedule','Notes','DisplayColor','Discussion'],
+    featureFetchFields: ['FormattedID','Name','DisplayColor','Discussion'],
     childrenFetchFields: ['FormattedID','Name','_ItemHierarchy','Blocked','BlockedReason','c_BlockerCreationDate','c_BlockerOwnerFirstLast'],
-    releaseField: 'c_CodeDeploymentSchedule',
+    reportBlockerFields: ['BlockedReason','c_BlockerCreationDate','c_BlockerOwnerFirstLast','FormattedID'],
+    
     launch: function() {
         this._initialize();
     },
     _initialize: function(){
-        this.logger.log('_initialize');
         var margin = 10; 
-        this.down('#selection_box').add({
-            xtype: 'rallyreleasecombobox',
-            itemId: 'cb-release',
-            fieldLabel: 'Release Filter',
-            labelAlign: 'right',
-            width: 250,
-            margin: margin,
-            context: {project: this.getContext().getProjectRef(), projectScopeDown: false}
+
+        this.down('#header_box').add({ 
+            xtype: 'container',
+            layout: {type: 'hbox'},
+            items: [{
+                xtype: 'rallyreleasecombobox',
+                itemId: 'cb-release',
+                fieldLabel: 'Release Filter',
+                labelAlign: 'right',
+                width: 250,
+                margin: margin,
+                context: {project: this.getContext().getProjectRef(), projectScopeDown: false}
+            },{
+               xtype: 'rallycombobox',
+               itemId: 'cb-feature-target-schedule',
+               fieldLabel: 'Feature Target Field',
+               labelAlign: 'right',
+               margin: margin,
+               width: 300,
+               labelWidth: 125,
+               store: this.featureTargetScheduleStore
+            },{
+                xtype: 'rallybutton',
+                text: 'Run',
+                scope: this,
+                margin: margin,
+                handler: this._run
+            },{ 
+                xtype: 'rallybutton',
+                text: 'Export',
+                itemId: 'btn-export',
+                scope: this,
+                margin: margin,
+                disabled: true,
+                handler: this._export
+            }]
         });
-        this.down('#selection_box').add({
-            xtype: 'rallybutton',
-            text: 'Run',
-            scope: this,
-            margin: margin,
-            handler: this._run
-        });
-        this.down('#selection_box').add({
-            xtype: 'rallybutton',
-            text: 'Export',
-            itemId: 'btn-export',
-            scope: this,
-            margin: margin,
-            disabled: true,
-            handler: this._export
-        });
+    },
+    _getFeatureTargetScheduleField: function(){
+        return this.down('#cb-feature-target-schedule').getValue() || this.defaultFeatureTargetField;
     },
     _export: function(){
         var store = this.down('#grd-report').getStore(); 
@@ -438,17 +882,33 @@ Ext.define('CustomApp', {
         var xml_text = '', style_xml = '';
         var counter = 0; 
         
+        //Write headers
+        var headers = ['CodeDeplymentSchedule','FormattedFeature','BlockerReasons','BlockerDate','BlockerOwner','Comments'];
+        var xml_text = Ext.String.format('<ss:Row><ss:Cell><ss:Data ss:Type="String">Status</ss:Data></ss:Cell>' +
+                '<ss:Cell><ss:Data ss:Type="String">{0}</ss:Data></ss:Cell>' +
+                '<ss:Cell><ss:Data ss:Type="String">{1}</ss:Data></ss:Cell>' +
+                '<ss:Cell><ss:Data ss:Type="String">{2}</ss:Data></ss:Cell>' +
+                '<ss:Cell><ss:Data ss:Type="String">{3}</ss:Data></ss:Cell>' +
+                '<ss:Cell><ss:Data ss:Type="String">{4}</ss:Data></ss:Cell>' +
+                '<ss:Cell><ss:Data ss:Type="String">{5}</ss:Data></ss:Cell>' +
+                '</ss:Row>',headers[0],headers[1],headers[2],headers[3],headers[4],headers[5]);
+        
         Ext.each(this.exportData, function(r){
             counter++;
             style_xml +=  Ext.String.format('<ss:Style ss:ID="s{0}"> <ss:Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1" /><ss:Interior ss:Color="{1}" ss:Pattern="Solid"/></ss:Style>',counter, r.get('FeatureStatus'));
             
+            var blocker_reasons = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerReasons')).replace('&lt;br/$gt;','&#13;');
+            blocker_reasons = blocker_reasons.replace('&lt;br/&gt;','&#13;',"g");
             
-            var blocker_reasons = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerReasons').replace('<br/>','|','g')).replace('<br/>','|','g');
-            var blocker_owner = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerOwner').replace('<br/>','|','g')).replace('<br/>','|','g'); //.replace('<br/>','&#10;','g'));
-            var blocker_dates = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerDate').replace('<br/>','|','g')).replace('<br/>','|','g');
+            var blocker_owner = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerOwner')); //.replace('<br/>','&#10;','g'));
+            blocker_owner = blocker_owner.replace('&lt;br/&gt;','&#13;',"g");
+            
+            var blocker_dates = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerDate'));
+            blocker_dates = blocker_dates.replace('&lt;br/&gt;','&#13;',"g");
+
             var feature = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('FormattedFeature'));
-            var comments = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('Comments')).replace('<br/>','|','g');
-            var cd_schedule = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('CodeDeploymentSchedule'));
+            var comments = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('Comments'));
+            var cd_schedule = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('FeatureTargetSchedule'));
             
             xml_text += Ext.String.format('<ss:Row><ss:Cell ss:StyleID="s{0}"><ss:Data ss:Type="String"></ss:Data></ss:Cell>' +
                     '<ss:Cell><ss:Data ss:Type="String">{1}</ss:Data></ss:Cell>' +
@@ -474,18 +934,21 @@ Ext.define('CustomApp', {
         
 //        Rally.technicalservices.FileUtilities.saveTextAsFile(html_text, 'features.html');
  //       html_text = Ext.String.format('<table>{0}</table>', html_text);
-        Rally.technicalservices.FileUtilities.saveTextAsFile(text,'feature-report.html');
+        Rally.technicalservices.FileUtilities.saveHTMLToFile(text,'feature-report.html');
         
     },
+    _getReleaseCombo: function(){
+        return this.down('#cb-release');
+    },
     _run: function(){
-        var release = this.down('#cb-release').getValue();
+        var release = this._getReleaseCombo().getValue();
         this.logger.log('_run');
         
         this._enableUI(false);
         this._fetchFeatures(release).then({
             scope: this,
             success: function(featureRecords){
-                this._fetchChildren(featureRecords).then({
+                this._fetchBlockedChildren(featureRecords).then({
                     scope: this,
                     success: function(data){
                         this.exportData = data;  
@@ -529,8 +992,8 @@ Ext.define('CustomApp', {
             },
             width: 25
         },{
-            text: 'Code Deployment Schedule',
-            dataIndex: 'c_CodeDeploymentSchedule'
+            text: 'Feature Target Schedule',
+            dataIndex: 'FeatureTargetSchedule'
         },{
             text: 'Feature',
             dataIndex: 'FeatureRef',
@@ -545,29 +1008,40 @@ Ext.define('CustomApp', {
         },{
             text: 'Blocker Reasons',
             dataIndex: 'BlockerReasons',
-            flex: 1
+            flex: 1,
+            renderer: this._arrayRenderer
         },{
             text: 'Blocker Date',
-            dataIndex: 'BlockerDate'
+            dataIndex: 'BlockerDate',
+                renderer: this._arrayRenderer
         },{
             text: 'Blocker Owner',
             dataIndex: 'BlockerOwner',
-            flex: 1
+            renderer: this._arrayRenderer,
+           flex: 1
         },{
             text: 'Comments',
             dataIndex: 'Comments',
             flex: 1
         }];
     },  
-    _fetchChildren: function(featureRecords){
+    _arrayRenderer: function(v,m,r){
+        console.log('_array',v);
+        if (Array.isArray(v)){
+            return v.join('<br/>');
+        }
+        return v;  
+        
+    },
+    _fetchBlockedChildren: function(featureRecords){
         var deferred = Ext.create('Deft.Deferred');
         this.logger.log('_fetchChildren',featureRecords.features, featureRecords.discussions);
         
         var fetch = this.childrenFetchFields;
         var find = {
-                '_TypeHierarchy': {$in: ['HierarchicalRequirement']},
+                '_TypeHierarchy': {$in: ['HierarchicalRequirement','Defect','Task']},
                 '__At': "current",
-                'Blocked': true
+                'Blocked': true,
         }; 
         
         var object_ids = _.map(featureRecords.features, function(f){return f.get('ObjectID');});
@@ -588,41 +1062,60 @@ Ext.define('CustomApp', {
         });
         return deferred;  
     },
-    _createModels: function(featureRecords, records){
-
+    _getDiscussionHash: function(featureRecords){
         var discussion_hash = {};
         Ext.each(featureRecords.discussions, function(d){
             discussion_hash[d.get('Artifact').ObjectID] = d.get('Text');
         });
-        
-        
+        return discussion_hash;  
+    },
+    _getBlockedChildrenForFeatureOid: function(blockedChildrenRecords, featureOid){
+        var blockerFields = this.reportBlockerFields; 
+        var blocked_children = [];  
+        Ext.each(blockedChildrenRecords, function(r){
+            
+            if (Ext.Array.contains(r.get('_ItemHierarchy'),featureOid)){
+                var obj = r.getData(); 
+                var child = _.pick(obj, blockerFields);
+                blocked_children.push(child);                      
+            }
+        }, this);
+        return blocked_children;
+    },
+    /**
+     * Called by _fetchBlockedChildren;  Creates the feature-status-model objects
+     * 
+     */
+    _createModels: function(featureRecords, blockedChildRecords){
+
+        var discussion_hash = this._getDiscussionHash(featureRecords);
+        var featureTargetScheduleField = this._getFeatureTargetScheduleField();
         var models = []; 
         Ext.each(featureRecords.features, function(f){
             var feature_oid = f.get('ObjectID');
-            var blocked_children = [];  
-            Ext.each(records, function(r){
-                if (Ext.Array.contains(r.get('_ItemHierarchy'),feature_oid)){
-                    blocked_children.push(r);
-                }
-            });
+            var blockedChildren = this._getBlockedChildrenForFeatureOid(blockedChildRecords, feature_oid);
+
             var model = Ext.create('Rally.technicalservices.data.FeatureStatusModel',{
                 ObjectID: feature_oid,
                 FeatureRef: f.get('_ref'),
                 FeatureStatus: f.get('DisplayColor') || '#C0C0C0',
-                CodeDeploymentSchedule: f.get(this.releaseField),
+                FeatureTargetSchedule: f.get(featureTargetScheduleField),
                 FeatureFormattedID: f.get('FormattedID'),
                 FeatureName: f.get('Name'),
-                BlockedChildren: blocked_children,  
+                BlockedChildren: blockedChildren,  
                 Comments: discussion_hash[feature_oid] || ''
             });
             models.push(model);
+            
         }, this);
         return models; 
     },
     _fetchFeatures: function(releaseRef){
         var deferred = Ext.create('Deft.Deferred');
+        var fetch = Ext.Array.merge(this.featureFetchFields, [this._getFeatureTargetScheduleField()]);
+        this.logger.log('_fetchFeatures',fetch);
         Ext.create('Rally.data.wsapi.Store',{
-            fetch: this.featureFetchFields,
+            fetch: fetch,
             model: this.featureModel,
             limit: 'Infinity',
             filters: [{
@@ -681,7 +1174,7 @@ Ext.define('CustomApp', {
     
 });
             
-               Rally.launchApp('CustomApp', {
+               Rally.launchApp('feature-status-report', {
                    name: 'Feature Status Report'
                });
         });
