@@ -214,6 +214,7 @@ Ext.define('feature-status-report', {
         }];
     },  
     _arrayRenderer: function(v,m,r){
+        console.log('_array',v);
         if (Array.isArray(v)){
             return v.join('<br/>');
         }

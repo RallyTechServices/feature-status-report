@@ -2,21 +2,21 @@
 <html>
 <head>
     <title>Feature Status Report</title>
-    <!--  (c) 2013 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Tue Mar 10 2015 11:30:13 GMT-0700 (PDT) -->
+    <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
+    <!--  Build Date: Wed Mar 11 2015 11:32:50 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Mar 10 2015 11:30:13 GMT-0700 (PDT)";
+        var APP_BUILD_DATE = "Wed Mar 11 2015 11:32:50 GMT-0700 (PDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     
-    <script type="text/javascript" src="/apps/2.0rc3/sdk.js"></script>
+    <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
 
     <script type="text/javascript">
         Rally.onReady(function() {
             
             
-               Rally.launchApp('CustomApp', {
+               Rally.launchApp('feature-status-report', {
                    name: 'Feature Status Report'
                });
         });

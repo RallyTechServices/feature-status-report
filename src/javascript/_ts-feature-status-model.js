@@ -12,13 +12,10 @@ Ext.define('Rally.technicalservices.data.FeatureStatusModel',{
                  name: 'BlockedChildren', 
                  convert: function(v, rec){
                      var obj_hash = {};
-                     var blockedChildrenDisplayFields = ['c_BlockerCreationDate','c_BlockerOwnerFirstLast','BlockedReason'];
-                     
                      var date_regex = new RegExp(/([0-9]+-[0-9]+-[0-9]+)T[0-9]+:[0-9]+:[0-9]+\.[0-9]+Z/);
                      Ext.each(v, function(obj){
                          var obj_hash_code  = JSON.stringify(obj, function(key, value) {
-                             //Only de-dup fields we are displaying for this type
-                             if (!Ext.Array.contains(blockedChildrenDisplayFields, key)){
+                             if (key == 'FormattedID'){
                                  return '';
                              }
                              //De-dup dates to the day
