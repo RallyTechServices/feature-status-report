@@ -27,7 +27,6 @@ Ext.define('Rally.technicalservices.data.FeatureStatusModel',{
                          });
                          obj_hash[obj_hash_code] = obj;  
                      }, this);
-                     console.log('de-dups',obj_hash);
                      var dedupedObjects = _.values(obj_hash);
                      return dedupedObjects;
                  }
