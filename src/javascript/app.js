@@ -46,6 +46,15 @@ Ext.define('feature-status-report', {
                store: this.featureTargetScheduleStore
             },{
                 xtype: 'rallybutton',
+                itemId: 'btn-filter',
+                margin: 10,
+                cls: 'small-icon secondary rly-small',
+                iconCls: 'icon-filter',
+                scope: this,
+                handler: this._filter
+                
+            },{
+                xtype: 'rallybutton',
                 text: 'Run',
                 scope: this,
                 margin: margin,
@@ -59,6 +68,29 @@ Ext.define('feature-status-report', {
                 disabled: true,
                 handler: this._export
             }]
+        });
+    },
+    _filter: function(btn){
+        Ext.create('Rally.technicalservices.dialog.Filter',{
+            model: this.featureModel,
+            filters: this.filters || [],
+            listeners: {
+                scope: this,
+                customfilter: function(filters){
+                    if (this.filters != filters){
+                        this.filters = filters; 
+                        if (filters.length == 0){
+                            btn.removeCls('primary');
+                            btn.addCls('secondary');
+                        } else {
+                            btn.removeCls('secondary');
+                            btn.addCls('primary');
+                        }
+                        this._run();
+                        
+                    }
+                }
+            }
         });
     },
     _getFeatureTargetScheduleField: function(){
@@ -301,15 +333,19 @@ Ext.define('feature-status-report', {
     _fetchFeatures: function(releaseRef){
         var deferred = Ext.create('Deft.Deferred');
         var fetch = Ext.Array.merge(this.featureFetchFields, [this._getFeatureTargetScheduleField()]);
+        
+        var filters = this.filters || []; 
+        var tempFilters = _.map(filters, function(f){return f;});
+        tempFilters.push({
+            property: 'Release',
+            value: releaseRef
+        });
         this.logger.log('_fetchFeatures',fetch);
         Ext.create('Rally.data.wsapi.Store',{
             fetch: fetch,
             model: this.featureModel,
             limit: 'Infinity',
-            filters: [{
-                property: 'Release',
-                value: releaseRef
-            }],
+            filters: tempFilters,
             autoLoad: true,
             context: {project: this.getContext().getProjectRef(), projectScopeDown: this.getContext().getProjectScopeDown()},
             listeners: {
