@@ -150,7 +150,6 @@ Ext.define('feature-status-report', {
         '<ss:Styles>{0}</ss:Styles>' +
         '<ss:Worksheet ss:Name="' + this.getContext().getProject().Name + '">' +
         '<ss:Table>{1}</ss:Table></ss:Worksheet></ss:Workbook>',style_xml, xml_text);
-        console.log(text);
         
 //        Rally.technicalservices.FileUtilities.saveTextAsFile(html_text, 'features.html');
  //       html_text = Ext.String.format('<table>{0}</table>', html_text);
@@ -207,7 +206,7 @@ Ext.define('feature-status-report', {
             text: 'Status',
             dataIndex: 'FeatureStatus',
             renderer: function(v,m,r){
-                m.style = "background-color: " + v + ";";
+                m.tdAttr = 'style = "background-color: ' + v + ';"';
                 return '';
             },
             width: 25
@@ -246,12 +245,10 @@ Ext.define('feature-status-report', {
         }];
     },  
     _arrayRenderer: function(v,m,r){
-        console.log('_array',v);
         if (Array.isArray(v)){
             return v.join('<br/>');
         }
         return v;  
-        
     },
     _fetchBlockedChildren: function(featureRecords){
         var deferred = Ext.create('Deft.Deferred');
