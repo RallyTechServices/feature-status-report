@@ -116,15 +116,19 @@ Ext.define('feature-status-report', {
         Ext.each(this.exportData, function(r){
             counter++;
             style_xml +=  Ext.String.format('<ss:Style ss:ID="s{0}"> <ss:Alignment ss:Horizontal="Center" ss:Vertical="Center" ss:WrapText="1" /><ss:Interior ss:Color="{1}" ss:Pattern="Solid"/></ss:Style>',counter, r.get('FeatureStatus'));
+
+            var blocker_reasons = r.get('BlockerReasons').join('&#13;');
+            var blocker_owner = r.get('BlockerOwner').join('&#13;');
+            var blocker_dates = r.get('BlockerDate').join('&#13;');
+
+            //var blocker_reasons = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerReasons')).replace('&lt;br/$gt;','&#13;');
+            //blocker_reasons = blocker_reasons.replace('&lt;br/&gt;','&#13;',"g");
             
-            var blocker_reasons = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerReasons')).replace('&lt;br/$gt;','&#13;');
-            blocker_reasons = blocker_reasons.replace('&lt;br/&gt;','&#13;',"g");
-            
-            var blocker_owner = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerOwner')); //.replace('<br/>','&#10;','g'));
-            blocker_owner = blocker_owner.replace('&lt;br/&gt;','&#13;',"g");
-            
-            var blocker_dates = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerDate'));
-            blocker_dates = blocker_dates.replace('&lt;br/&gt;','&#13;',"g");
+            //var blocker_owner = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerOwner')); //.replace('<br/>','&#10;','g'));
+            //blocker_owner = blocker_owner.replace('&lt;br/&gt;','&#13;',"g");
+            //
+            //var blocker_dates = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('BlockerDate'));
+            //blocker_dates = blocker_dates.replace('&lt;br/&gt;','&#13;',"g");
 
             var feature = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('FormattedFeature'));
             var comments = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('Comments'));

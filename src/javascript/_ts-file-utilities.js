@@ -77,12 +77,16 @@ Ext.define('Rally.technicalservices.FileUtilities', {
         return text;
     },
     scrubStringForXML: function(string){
-        var scrubbed_string = string.replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&apos;');
-        return scrubbed_string;  
+        console.log('scrub',string);
+        if (string) {
+            var scrubbed_string = string.replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&apos;');
+            return scrubbed_string;
+        }
+        return '';
     },
     detectIE: function(){
         var ua = window.navigator.userAgent;
