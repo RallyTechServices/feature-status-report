@@ -310,6 +310,7 @@ Ext.define('feature-status-report', {
     _createModels: function(featureRecords, blockedChildRecords){
 
         var discussion_hash = this._getDiscussionHash(featureRecords);
+        this.logger.log('_createModels',discussion_hash);
         var featureTargetScheduleField = this._getFeatureTargetScheduleField();
         var models = []; 
         Ext.each(featureRecords.features, function(f){
@@ -373,7 +374,7 @@ Ext.define('feature-status-report', {
             var discussions = r.get('Discussion').Count;
             if (discussions > 0){
                 promises.push(r.getCollection('Discussion').load({
-                    fetch: ['Text'],
+                    fetch: ['Text','Artifact','ObjectID'],
                     filters: [{
                         property: 'PostNumber',
                         value: discussions - 1 //Get the latest post
