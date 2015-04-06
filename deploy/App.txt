@@ -3,11 +3,11 @@
 <head>
     <title>Feature Status Report</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Thu Mar 26 2015 18:29:16 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Apr 06 2015 16:00:53 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Mar 26 2015 18:29:16 GMT-0600 (MDT)";
-        var CHECKSUM = 64663638719;
+        var APP_BUILD_DATE = "Mon Apr 06 2015 16:00:53 GMT-0600 (MDT)";
+        var CHECKSUM = 64903767546;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -1510,6 +1510,7 @@ Ext.define('feature-status-report', {
     _createModels: function(featureRecords, blockedChildRecords){
 
         var discussion_hash = this._getDiscussionHash(featureRecords);
+        this.logger.log('_createModels',discussion_hash);
         var featureTargetScheduleField = this._getFeatureTargetScheduleField();
         var models = []; 
         Ext.each(featureRecords.features, function(f){
@@ -1573,7 +1574,7 @@ Ext.define('feature-status-report', {
             var discussions = r.get('Discussion').Count;
             if (discussions > 0){
                 promises.push(r.getCollection('Discussion').load({
-                    fetch: ['Text'],
+                    fetch: ['Text','Artifact','ObjectID'],
                     filters: [{
                         property: 'PostNumber',
                         value: discussions - 1 //Get the latest post
