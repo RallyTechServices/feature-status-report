@@ -3,11 +3,11 @@
 <head>
     <title>Feature Status Report</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Apr 06 2015 16:00:53 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon May 18 2015 13:29:25 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Apr 06 2015 16:00:53 GMT-0600 (MDT)";
-        var CHECKSUM = 64903767546;
+        var APP_BUILD_DATE = "Mon May 18 2015 13:29:25 GMT-0700 (PDT)";
+        var CHECKSUM = 67028131779;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -629,6 +629,8 @@ Ext.define('Rally.technicalservices.data.FeatureStatusModel',{
     fields: [
              {name: 'FeatureStatus' },
              {name: 'FeatureRef', type:'string'},
+             {name: 'State', type:'string'},
+           //  {name: 'InitiativeRef'},
              {name: 'ObjectID', type: 'int'},
              {name: 'FeatureTargetSchedule', type: 'string'},
              {name: 'FeatureFormattedID', type: 'string'},
@@ -1209,12 +1211,12 @@ Ext.define('feature-status-report', {
         {xtype:'tsinfolink'}
     ],
     featureTargetScheduleStore: [
-         ['c_FeatureTargetMonth','Feature Target Month'],
+         ['c_FeatureTargetSprint','Feature Target Sprint'],
          ['c_CodeDeploymentSchedule','Code Deployment Schedule']
     ],
     defaultFeatureTargetField: 'c_CodeDeploymentSchedule',
     featureModel: 'PortfolioItem/Feature',
-    featureFetchFields: ['FormattedID','Name','DisplayColor','Discussion'],
+    featureFetchFields: ['FormattedID','Name','DisplayColor','Discussion','Parent','State'],
     childrenFetchFields: ['FormattedID','Name','_ItemHierarchy','Blocked','BlockedReason','c_BlockerCreationDate','c_BlockerOwnerFirstLast'],
     reportBlockerFields: ['BlockedReason','c_BlockerCreationDate','c_BlockerOwnerFirstLast','FormattedID'],
     
@@ -1333,7 +1335,8 @@ Ext.define('feature-status-report', {
             var feature = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('FormattedFeature'));
             var comments = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('Comments'));
             var cd_schedule = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('FeatureTargetSchedule'));
-            
+            var state = Rally.technicalservices.FileUtilities.scrubStringForXML(r.get('State'));
+
             xml_text += Ext.String.format('<ss:Row><ss:Cell ss:StyleID="s{0}"><ss:Data ss:Type="String"></ss:Data></ss:Cell>' +
                     '<ss:Cell><ss:Data ss:Type="String">{1}</ss:Data></ss:Cell>' +
                     '<ss:Cell><ss:Data ss:Type="String">{2}</ss:Data></ss:Cell>' +
@@ -1341,8 +1344,9 @@ Ext.define('feature-status-report', {
                     '<ss:Cell><ss:Data ss:Type="String">{4}</ss:Data></ss:Cell>' +
                     '<ss:Cell><ss:Data ss:Type="String">{5}</ss:Data></ss:Cell>' +
                     '<ss:Cell><ss:Data ss:Type="String">{6}</ss:Data></ss:Cell>' +
+                    '<ss:Cell><ss:Data ss:Type="String">{7}</ss:Data></ss:Cell>' +
                     '</ss:Row>',counter,
-                    cd_schedule,feature,blocker_reasons,blocker_dates, 
+                    cd_schedule,feature,state, blocker_reasons,blocker_dates,
                     blocker_owner, 
                     comments);
         });
@@ -1418,6 +1422,20 @@ Ext.define('feature-status-report', {
             text: 'Feature Target Schedule',
             dataIndex: 'FeatureTargetSchedule'
         },{
+        //    text: 'Initiative',
+        //    dataIndex: 'InitiativeRef',
+        //    renderer: function(v,m,r){
+        //        if (v){
+        //            var link_text = Ext.String.format('{0}: {1}', v.FormattedID, v.Name);
+        //            if (v){
+        //                return Rally.nav.DetailLink.getLink({record: v, text: link_text});
+        //            }
+        //            return link_text;
+        //        }
+        //        return '';
+        //    },
+        //    flex: 1
+        //},{
             text: 'Feature',
             dataIndex: 'FeatureRef',
             renderer: function(v,m,r){
@@ -1428,6 +1446,9 @@ Ext.define('feature-status-report', {
                 return link_text;
             },
             flex: 1
+        },{
+            text: 'State',
+            dataIndex: 'State'
         },{
             text: 'Blocker Reasons',
             dataIndex: 'BlockerReasons',
@@ -1517,12 +1538,18 @@ Ext.define('feature-status-report', {
             var feature_oid = f.get('ObjectID');
             var blockedChildren = this._getBlockedChildrenForFeatureOid(blockedChildRecords, feature_oid);
 
+            var state = '';
+            if (f.get('State')){
+                state = f.get('State').Name;
+            }
             var model = Ext.create('Rally.technicalservices.data.FeatureStatusModel',{
                 ObjectID: feature_oid,
                 FeatureRef: f.get('_ref'),
+               // InitiativeRef: f.get('Parent'),
                 FeatureStatus: f.get('DisplayColor') || '#C0C0C0',
                 FeatureTargetSchedule: f.get(featureTargetScheduleField),
                 FeatureFormattedID: f.get('FormattedID'),
+                State: state,
                 FeatureName: f.get('Name'),
                 BlockedChildren: blockedChildren,  
                 Comments: discussion_hash[feature_oid] || ''

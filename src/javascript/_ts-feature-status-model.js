@@ -4,6 +4,8 @@ Ext.define('Rally.technicalservices.data.FeatureStatusModel',{
     fields: [
              {name: 'FeatureStatus' },
              {name: 'FeatureRef', type:'string'},
+             {name: 'State', type:'string'},
+           //  {name: 'InitiativeRef'},
              {name: 'ObjectID', type: 'int'},
              {name: 'FeatureTargetSchedule', type: 'string'},
              {name: 'FeatureFormattedID', type: 'string'},
